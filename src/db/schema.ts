@@ -19,9 +19,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
   theme_preference TEXT NOT NULL DEFAULT 'dark',
   notifications_enabled INTEGER NOT NULL DEFAULT 1,
   morning_reminder_time TEXT NOT NULL DEFAULT '07:00',
-  revision_reminder_time TEXT NOT NULL DEFAULT '14:00',
-  target_reminder_time TEXT NOT NULL DEFAULT '18:00',
-  evening_reminder_time TEXT NOT NULL DEFAULT '22:00',
+  night_reminder_time TEXT NOT NULL DEFAULT '21:00',
   is_onboarded INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -33,54 +31,19 @@ CREATE TABLE IF NOT EXISTS subjects (
   name TEXT NOT NULL,
   icon TEXT NOT NULL,
   color TEXT NOT NULL,
-  default_order INTEGER NOT NULL,
-  target_week INTEGER NOT NULL,
+  gradient_start TEXT NOT NULL DEFAULT '#6366F1',
+  gradient_end TEXT NOT NULL DEFAULT '#8B5CF6',
+  queue_order INTEGER NOT NULL DEFAULT 1,
   total_lectures INTEGER NOT NULL DEFAULT 30,
+  completed_lectures INTEGER NOT NULL DEFAULT 0,
   is_lecture_count_estimated INTEGER NOT NULL DEFAULT 1,
-  total_dpps INTEGER,
-  is_custom INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS topics (
-  id TEXT PRIMARY KEY,
-  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  subtopics_json TEXT NOT NULL DEFAULT '[]',
-  lecture_count INTEGER NOT NULL DEFAULT 0,
-  pyq_count INTEGER NOT NULL DEFAULT 0,
-  is_completed INTEGER NOT NULL DEFAULT 0,
-  completed_at TEXT,
-  difficulty_level TEXT NOT NULL DEFAULT 'Medium',
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS lectures (
-  id TEXT PRIMARY KEY,
-  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  topic_id TEXT REFERENCES topics(id) ON DELETE CASCADE,
-  lecture_num INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  duration_minutes INTEGER NOT NULL DEFAULT 90,
-  pw_url TEXT,
-  is_completed INTEGER NOT NULL DEFAULT 0,
-  actual_time_spent_minutes INTEGER NOT NULL DEFAULT 0,
-  completed_at TEXT,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS dpps (
-  id TEXT PRIMARY KEY,
-  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  dpp_num INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  questions_count INTEGER NOT NULL DEFAULT 10,
-  attempted INTEGER NOT NULL DEFAULT 0,
-  correct INTEGER NOT NULL DEFAULT 0,
-  incorrect INTEGER NOT NULL DEFAULT 0,
-  is_completed INTEGER NOT NULL DEFAULT 0,
-  completed_at TEXT,
-  time_spent_minutes INTEGER NOT NULL DEFAULT 0,
+  total_dpps INTEGER NOT NULL DEFAULT 0,
+  completed_dpps INTEGER NOT NULL DEFAULT 0,
+  pyqs_attempted INTEGER NOT NULL DEFAULT 0,
+  pyqs_correct INTEGER NOT NULL DEFAULT 0,
+  pyqs_target INTEGER NOT NULL DEFAULT 80,
+  is_active INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'in_queue',
   created_at TEXT NOT NULL
 );
 
@@ -92,50 +55,24 @@ CREATE TABLE IF NOT EXISTS daily_goals (
   target_dpps INTEGER NOT NULL DEFAULT 2,
   target_pyqs INTEGER NOT NULL DEFAULT 20,
   target_revision_minutes INTEGER NOT NULL DEFAULT 60,
+  focus_subject_id TEXT REFERENCES subjects(id) ON DELETE SET NULL,
+  is_morning_set INTEGER NOT NULL DEFAULT 0,
+  morning_set_at TEXT,
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS daily_tasks (
+CREATE TABLE IF NOT EXISTS daily_progress (
   id TEXT PRIMARY KEY,
-  date TEXT NOT NULL,
-  category TEXT NOT NULL,
-  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  topic_id TEXT REFERENCES topics(id) ON DELETE SET NULL,
-  lecture_id TEXT REFERENCES lectures(id) ON DELETE SET NULL,
-  dpp_id TEXT REFERENCES dpps(id) ON DELETE SET NULL,
-  title TEXT NOT NULL,
-  target_count INTEGER NOT NULL DEFAULT 1,
-  completed_count INTEGER NOT NULL DEFAULT 0,
-  is_completed INTEGER NOT NULL DEFAULT 0,
-  completed_at TEXT,
-  notes TEXT,
-  order_index INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS revision_schedules (
-  id TEXT PRIMARY KEY,
-  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
-  interval_stage TEXT NOT NULL,
-  scheduled_date TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  completed_at TEXT,
-  skip_reason TEXT,
-  time_spent_minutes INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS revision_history (
-  id TEXT PRIMARY KEY,
-  schedule_id TEXT NOT NULL,
-  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
-  interval_stage TEXT NOT NULL,
-  scheduled_date TEXT NOT NULL,
-  completed_at TEXT NOT NULL,
-  time_spent_minutes INTEGER NOT NULL DEFAULT 0,
-  notes TEXT,
+  date TEXT NOT NULL UNIQUE,
+  total_study_seconds INTEGER NOT NULL DEFAULT 0,
+  lectures_completed INTEGER NOT NULL DEFAULT 0,
+  dpps_completed INTEGER NOT NULL DEFAULT 0,
+  pyqs_attempted INTEGER NOT NULL DEFAULT 0,
+  pyqs_correct INTEGER NOT NULL DEFAULT 0,
+  night_review_done INTEGER NOT NULL DEFAULT 0,
+  night_review_at TEXT,
+  reflection_notes TEXT,
+  target_achieved_pct REAL NOT NULL DEFAULT 0.0,
   created_at TEXT NOT NULL
 );
 
@@ -143,7 +80,6 @@ CREATE TABLE IF NOT EXISTS pyq_attempts (
   id TEXT PRIMARY KEY,
   gate_year INTEGER NOT NULL,
   subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
   question_number INTEGER NOT NULL,
   marks INTEGER NOT NULL DEFAULT 1,
   difficulty TEXT NOT NULL DEFAULT 'Medium',
@@ -159,7 +95,6 @@ CREATE TABLE IF NOT EXISTS mistake_logs (
   id TEXT PRIMARY KEY,
   pyq_attempt_id TEXT REFERENCES pyq_attempts(id) ON DELETE CASCADE,
   subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
   mistake_category TEXT NOT NULL,
   explanation TEXT NOT NULL,
   is_resolved INTEGER NOT NULL DEFAULT 0,
@@ -171,27 +106,9 @@ CREATE TABLE IF NOT EXISTS study_sessions (
   id TEXT PRIMARY KEY,
   date TEXT NOT NULL,
   subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  task_category TEXT NOT NULL,
-  topic_id TEXT REFERENCES topics(id) ON DELETE SET NULL,
   duration_seconds INTEGER NOT NULL DEFAULT 0,
   started_at TEXT NOT NULL,
   ended_at TEXT NOT NULL,
-  is_paused INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS daily_progress (
-  id TEXT PRIMARY KEY,
-  date TEXT NOT NULL UNIQUE,
-  total_study_seconds INTEGER NOT NULL DEFAULT 0,
-  lectures_completed INTEGER NOT NULL DEFAULT 0,
-  dpps_completed INTEGER NOT NULL DEFAULT 0,
-  pyqs_attempted INTEGER NOT NULL DEFAULT 0,
-  pyqs_correct INTEGER NOT NULL DEFAULT 0,
-  revisions_completed INTEGER NOT NULL DEFAULT 0,
-  revision_minutes INTEGER NOT NULL DEFAULT 0,
-  tasks_completed INTEGER NOT NULL DEFAULT 0,
-  total_tasks INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
@@ -201,16 +118,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 
 -- Essential Performance Indexes
-CREATE INDEX IF NOT EXISTS idx_topics_subject ON topics(subject_id);
-CREATE INDEX IF NOT EXISTS idx_lectures_topic ON lectures(topic_id);
-CREATE INDEX IF NOT EXISTS idx_dpps_subject ON dpps(subject_id);
-CREATE INDEX IF NOT EXISTS idx_daily_tasks_date ON daily_tasks(date);
-CREATE INDEX IF NOT EXISTS idx_daily_tasks_cat ON daily_tasks(category);
-CREATE INDEX IF NOT EXISTS idx_revision_date ON revision_schedules(scheduled_date, status);
-CREATE INDEX IF NOT EXISTS idx_revision_topic ON revision_schedules(topic_id);
-CREATE INDEX IF NOT EXISTS idx_pyq_subject_topic ON pyq_attempts(subject_id, topic_id);
-CREATE INDEX IF NOT EXISTS idx_pyq_date ON pyq_attempts(attempted_at);
-CREATE INDEX IF NOT EXISTS idx_mistake_topic ON mistake_logs(topic_id);
-CREATE INDEX IF NOT EXISTS idx_study_date ON study_sessions(date);
+CREATE INDEX IF NOT EXISTS idx_subjects_queue ON subjects(queue_order);
+CREATE INDEX IF NOT EXISTS idx_subjects_active ON subjects(is_active);
+CREATE INDEX IF NOT EXISTS idx_daily_goals_date ON daily_goals(date);
 CREATE INDEX IF NOT EXISTS idx_daily_progress_date ON daily_progress(date);
+CREATE INDEX IF NOT EXISTS idx_pyq_subject ON pyq_attempts(subject_id);
+CREATE INDEX IF NOT EXISTS idx_pyq_date ON pyq_attempts(attempted_at);
+CREATE INDEX IF NOT EXISTS idx_mistake_subject ON mistake_logs(subject_id);
+CREATE INDEX IF NOT EXISTS idx_study_date ON study_sessions(date);
 `;

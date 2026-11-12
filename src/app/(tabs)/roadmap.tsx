@@ -8,412 +8,421 @@ import {
   SafeAreaView,
   Modal,
   TextInput,
-  Alert,
-  Switch
+  Switch,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../stores/appStore';
 import {
-  getSubjectProgressSummaries,
-  getTopicsForSubject,
-  getLecturesForTopic,
-  updateLecture,
-  updateSubjectCounts,
-  addCustomTopic
+  getSubjectsInQueue,
+  moveSubjectQueue,
+  setSubjectActive,
+  updateSubjectProgress,
+  updateSubjectDetails,
 } from '../../db/database';
-import { Badge } from '../../components/Badge';
-import { SubjectProgressSummary, Topic, Lecture, DifficultyLevel } from '../../types';
+import { Subject } from '../../types';
+import { Colors, Gradients } from '../../constants/theme';
+import { Card3D } from '../../components/Card3D';
 
-export default function RoadmapScreen() {
+export default function QueueScreen() {
   const { dataVersion, triggerRefresh } = useAppStore();
-  const [summaries, setSummaries] = useState<SubjectProgressSummary[]>([]);
-  const [expandedSubjId, setExpandedSubjId] = useState<string | null>('ga');
-  const [subjTopics, setSubjTopics] = useState<Record<string, Topic[]>>({});
-  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
-  const [topicLectures, setTopicLectures] = useState<Record<string, Lecture[]>>({});
+  const [subjects, setSubjects] = useState<Subject[]>([]);
 
-  // Edit Subject Modal
+  // Edit Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingSubj, setEditingSubj] = useState<SubjectProgressSummary | null>(null);
+  const [editingSubj, setEditingSubj] = useState<Subject | null>(null);
+  const [editName, setEditName] = useState('');
   const [editTotalLec, setEditTotalLec] = useState('');
   const [editIsEstimated, setEditIsEstimated] = useState(false);
   const [editTotalDpps, setEditTotalDpps] = useState('');
 
-  // Add Custom Topic Modal
-  const [addTopicModalVisible, setAddTopicModalVisible] = useState(false);
-  const [newTopicName, setNewTopicName] = useState('');
-  const [newTopicLecCount, setNewTopicLecCount] = useState('4');
-  const [newTopicDiff, setNewTopicDiff] = useState<DifficultyLevel>('Medium');
-
   const loadData = async () => {
     try {
-      const data = await getSubjectProgressSummaries();
-      setSummaries(data);
-
-      if (expandedSubjId) {
-        const topics = await getTopicsForSubject(expandedSubjId);
-        setSubjTopics((prev) => ({ ...prev, [expandedSubjId]: topics }));
-      }
+      const list = await getSubjectsInQueue();
+      setSubjects(list);
     } catch (e) {
-      console.error('Error loading roadmap:', e);
+      console.error('Error loading subjects queue:', e);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [dataVersion, expandedSubjId])
+    }, [dataVersion])
   );
 
-  const toggleExpandSubject = async (subjId: string) => {
-    if (expandedSubjId === subjId) {
-      setExpandedSubjId(null);
-    } else {
-      setExpandedSubjId(subjId);
-      const topics = await getTopicsForSubject(subjId);
-      setSubjTopics((prev) => ({ ...prev, [subjId]: topics }));
+  const triggerHaptic = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
-  const toggleExpandTopic = async (topicId: string) => {
-    if (expandedTopicId === topicId) {
-      setExpandedTopicId(null);
-    } else {
-      setExpandedTopicId(topicId);
-      const lecs = await getLecturesForTopic(topicId);
-      setTopicLectures((prev) => ({ ...prev, [topicId]: lecs }));
-    }
-  };
-
-  const handleToggleLecture = async (lecture: Lecture) => {
-    const nextVal = lecture.is_completed === 1 ? 0 : 1;
-    await updateLecture(lecture.id, { is_completed: nextVal });
-    if (lecture.topic_id) {
-      const lecs = await getLecturesForTopic(lecture.topic_id);
-      setTopicLectures((prev) => ({ ...prev, [lecture.topic_id!]: lecs }));
-    }
-    triggerRefresh();
+  const handleMove = async (subjectId: string, direction: 'up' | 'down') => {
+    triggerHaptic();
+    await moveSubjectQueue(subjectId, direction);
     await loadData();
+    triggerRefresh();
   };
 
-  const openEditModal = (summary: SubjectProgressSummary) => {
-    setEditingSubj(summary);
-    setEditTotalLec(summary.total_lectures.toString());
-    setEditIsEstimated(summary.is_lecture_count_estimated);
-    setEditTotalDpps(summary.total_dpps !== null ? summary.total_dpps.toString() : '');
+  const handleMakeActive = async (subjectId: string) => {
+    triggerHaptic();
+    await setSubjectActive(subjectId);
+    await loadData();
+    triggerRefresh();
+  };
+
+  const handleProgress = async (
+    subjectId: string,
+    delta: {
+      completed_lectures?: number;
+      completed_dpps?: number;
+      pyqs_attempted?: number;
+    }
+  ) => {
+    triggerHaptic();
+    await updateSubjectProgress(subjectId, delta);
+    await loadData();
+    triggerRefresh();
+  };
+
+  const openEdit = (subj: Subject) => {
+    setEditingSubj(subj);
+    setEditName(subj.name);
+    setEditTotalLec(subj.total_lectures.toString());
+    setEditIsEstimated(subj.is_lecture_count_estimated === 1);
+    setEditTotalDpps(subj.total_dpps.toString());
     setEditModalVisible(true);
   };
 
-  const saveSubjectCounts = async () => {
+  const saveEdit = async () => {
     if (!editingSubj) return;
-    const lecs = parseInt(editTotalLec, 10) || editingSubj.total_lectures;
-    const dpps = editTotalDpps.trim() === '' ? null : parseInt(editTotalDpps, 10);
-
-    await updateSubjectCounts(
-      editingSubj.subject.id,
-      lecs,
-      editIsEstimated,
-      isNaN(dpps as number) ? null : dpps
-    );
-
-    setEditModalVisible(false);
-    triggerRefresh();
-    await loadData();
-    Alert.alert('Updated', 'Subject lecture & DPP counts updated.');
-  };
-
-  const handleCreateTopic = async () => {
-    if (!expandedSubjId || !newTopicName.trim()) {
-      Alert.alert('Error', 'Please enter a valid topic title.');
-      return;
+    try {
+      const totalLec = parseInt(editTotalLec, 10) || editingSubj.total_lectures;
+      const totalDpp = parseInt(editTotalDpps, 10) || 0;
+      await updateSubjectDetails(editingSubj.id, {
+        name: editName.trim() || editingSubj.name,
+        total_lectures: totalLec,
+        total_dpps: totalDpp,
+        is_lecture_count_estimated: editIsEstimated ? 1 : 0,
+      });
+      setEditModalVisible(false);
+      setEditingSubj(null);
+      await loadData();
+      triggerRefresh();
+    } catch (e) {
+      console.error(e);
     }
-
-    const count = parseInt(newTopicLecCount, 10) || 3;
-    await addCustomTopic(expandedSubjId, newTopicName.trim(), ['Subtopic 1'], count, newTopicDiff);
-    setAddTopicModalVisible(false);
-    setNewTopicName('');
-    const updated = await getTopicsForSubject(expandedSubjId);
-    setSubjTopics((prev) => ({ ...prev, [expandedSubjId]: updated }));
-    triggerRefresh();
-    await loadData();
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.container}>
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.badgeRow}>
-            <Badge label="PARAKRAM GATE 2027 BATCH B" variant="primary" />
+          <View>
+            <Text style={styles.headerTitle}>GATE Study Queue</Text>
+            <Text style={styles.headerSubtitle}>
+              Organize subjects in your priority order • #1 is Active
+            </Text>
           </View>
-          <Text style={styles.screenTitle}>12-Week Syllabus Roadmap</Text>
-          <Text style={styles.screenSubtitle}>
-            Full curriculum breakdown with confirmed vs estimated PW counts
-          </Text>
+          <View style={styles.subjectCountBadge}>
+            <Text style={styles.subjectCountText}>{subjects.length} Subjects</Text>
+          </View>
         </View>
 
-        {summaries.map((item, idx) => {
-          const isExpanded = expandedSubjId === item.subject.id;
-          const topics = subjTopics[item.subject.id] || [];
+        <ScrollView
+          style={styles.scrollList}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {subjects.map((subj, index) => {
+            const isFirst = index === 0;
+            const isLast = index === subjects.length - 1;
+            const isActive = subj.is_active === 1 || isFirst;
 
-          return (
-            <View key={item.subject.id} style={styles.subjectCard}>
-              <TouchableOpacity
-                style={styles.subjectCardHeader}
-                activeOpacity={0.8}
-                onPress={() => toggleExpandSubject(item.subject.id)}
+            const lecPct =
+              subj.total_lectures > 0
+                ? Math.min(100, Math.round((subj.completed_lectures / subj.total_lectures) * 100))
+                : 0;
+
+            const dppPct =
+              subj.total_dpps > 0
+                ? Math.min(100, Math.round((subj.completed_dpps / subj.total_dpps) * 100))
+                : 0;
+
+            const accuracy =
+              subj.pyqs_attempted > 0
+                ? Math.round((subj.pyqs_correct / subj.pyqs_attempted) * 100)
+                : 0;
+
+            return (
+              <Card3D
+                key={subj.id}
+                gradient={[subj.gradient_start, subj.gradient_end] as any}
+                style={[
+                  styles.cardWrapper,
+                  isActive && {
+                    borderColor: '#FFFFFF',
+                    shadowColor: subj.color,
+                    shadowOpacity: 0.65,
+                    shadowRadius: 20,
+                  },
+                ]}
               >
-                <View style={styles.subjectTopRow}>
-                  <View style={styles.subjCodeBadge}>
-                    <Text style={styles.subjCodeText}>{item.subject.code}</Text>
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.subjName}>{item.subject.name}</Text>
-                    <Text style={styles.weekTag}>Week {item.subject.target_week || idx + 1}</Text>
-                  </View>
-
-                  <View style={styles.badgesCol}>
-                    {item.is_lecture_count_estimated ? (
-                      <Badge label="ESTIMATED" variant="estimated" size="sm" />
-                    ) : (
-                      <Badge label="CONFIRMED" variant="success" size="sm" />
-                    )}
-                  </View>
-                </View>
-
-                {/* Progress bar */}
-                <View style={styles.progBarBg}>
-                  <View
-                    style={[
-                      styles.progBarFill,
-                      {
-                        width: `${item.completion_percentage}%`,
-                        backgroundColor: item.subject.color || '#38BDF8'
-                      }
-                    ]}
-                  />
-                </View>
-
-                {/* Metrics Summary Row */}
-                <View style={styles.metricsRow}>
-                  <Text style={styles.metricItem}>
-                    <Text style={styles.metricBold}>{item.completed_lectures}</Text>/
-                    {item.total_lectures} Lec
-                  </Text>
-                  <Text style={styles.metricItem}>
-                    DPP:{' '}
-                    <Text style={styles.metricBold}>
-                      {item.completed_dpps}/{item.total_dpps !== null ? item.total_dpps : 'Unset'}
-                    </Text>
-                  </Text>
-                  <Text style={styles.metricItem}>
-                    PYQ:{' '}
-                    <Text style={styles.metricBold}>
-                      {item.pyq_accuracy !== null ? `${item.pyq_accuracy}%` : 'Not Started'}
-                    </Text>
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    onPress={() => openEditModal(item)}
-                  >
-                    <Ionicons name="create-outline" size={14} color="#38BDF8" />
-                    <Text style={styles.editBtnText}>Edit</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-
-              {/* Expanded Topics List */}
-              {isExpanded && (
-                <View style={styles.topicsContainer}>
-                  <View style={styles.topicHeaderRow}>
-                    <Text style={styles.topicListHeader}>Topics & PW Lectures</Text>
-                    <TouchableOpacity
-                      style={styles.addTopicBtn}
-                      onPress={() => setAddTopicModalVisible(true)}
+                {/* Card Top Row: Rank, Title, Queue Buttons */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.titleGroup}>
+                    <View
+                      style={[
+                        styles.rankPill,
+                        isActive && { backgroundColor: '#FFFFFF' },
+                      ]}
                     >
-                      <Ionicons name="add" size={14} color="#38BDF8" />
-                      <Text style={styles.addTopicText}>Add Topic</Text>
+                      <Text
+                        style={[
+                          styles.rankPillText,
+                          isActive && { color: subj.color, fontWeight: '800' },
+                        ]}
+                      >
+                        {isActive ? '★ #1 ACTIVE' : `#${subj.queue_order}`}
+                      </Text>
+                    </View>
+                    <View style={styles.nameWrap}>
+                      <Text style={styles.subjectName}>{subj.name}</Text>
+                      <Text style={styles.subjectCode}>{subj.code}</Text>
+                    </View>
+                  </View>
+
+                  {/* Actions: Up, Down, Edit */}
+                  <View style={styles.actionGroup}>
+                    {!isFirst && (
+                      <TouchableOpacity
+                        onPress={() => handleMove(subj.id, 'up')}
+                        style={styles.iconBtn}
+                      >
+                        <Ionicons name="arrow-up" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    )}
+                    {!isLast && (
+                      <TouchableOpacity
+                        onPress={() => handleMove(subj.id, 'down')}
+                        style={styles.iconBtn}
+                      >
+                        <Ionicons name="arrow-down" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => openEdit(subj)}
+                      style={styles.iconBtn}
+                    >
+                      <Ionicons name="pencil" size={14} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
+                </View>
 
-                  {topics.map((t) => {
-                    const isTopicExpanded = expandedTopicId === t.id;
-                    const lecs = topicLectures[t.id] || [];
-
-                    return (
-                      <View key={t.id} style={styles.topicCard}>
-                        <TouchableOpacity
-                          style={styles.topicHeader}
-                          activeOpacity={0.7}
-                          onPress={() => toggleExpandTopic(t.id)}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.topicTitle}>{t.name}</Text>
-                            <Text style={styles.topicSub}>{t.subtopics.join(' • ')}</Text>
-                          </View>
-
-                          <View style={styles.topicRight}>
-                            <Badge label={t.difficulty_level} variant="neutral" size="sm" />
-                            <Ionicons
-                              name={isTopicExpanded ? 'chevron-up' : 'chevron-down'}
-                              size={16}
-                              color="#64748B"
-                            />
-                          </View>
-                        </TouchableOpacity>
-
-                        {/* Lecture list inside topic */}
-                        {isTopicExpanded && (
-                          <View style={styles.lecturesList}>
-                            {lecs.length === 0 ? (
-                              <Text style={styles.noLecText}>
-                                No lectures generated yet for this topic.
-                              </Text>
-                            ) : (
-                              lecs.map((l) => (
-                                <TouchableOpacity
-                                  key={l.id}
-                                  style={[
-                                    styles.lectureItem,
-                                    l.is_completed === 1 && styles.lectureItemDone
-                                  ]}
-                                  onPress={() => handleToggleLecture(l)}
-                                >
-                                  <Ionicons
-                                    name={l.is_completed === 1 ? 'checkbox' : 'square-outline'}
-                                    size={18}
-                                    color={l.is_completed === 1 ? '#10B981' : '#64748B'}
-                                  />
-                                  <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <Text
-                                      style={[
-                                        styles.lectureTitle,
-                                        l.is_completed === 1 && styles.lectureTitleDone
-                                      ]}
-                                    >
-                                      L{l.lecture_num}: {l.title}
-                                    </Text>
-                                    <Text style={styles.lectureDuration}>
-                                      {l.duration_minutes} mins
-                                    </Text>
-                                  </View>
-                                </TouchableOpacity>
-                              ))
-                            )}
+                {/* 3 Metric Rows: Lectures, DPP, PYQ */}
+                <View style={styles.countersContainer}>
+                  {/* 1. LECTURES */}
+                  <View style={styles.counterRow}>
+                    <View style={styles.counterInfo}>
+                      <View style={styles.labelWithTag}>
+                        <Ionicons name="play-circle" size={15} color="#FFFFFF" />
+                        <Text style={styles.counterLabel}>Lectures Seen</Text>
+                        {subj.is_lecture_count_estimated === 1 && (
+                          <View style={styles.estBadge}>
+                            <Text style={styles.estBadgeText}>ESTIMATED</Text>
                           </View>
                         )}
                       </View>
-                    );
-                  })}
+                      <Text style={styles.counterStats}>
+                        {subj.completed_lectures} / {subj.total_lectures} ({lecPct}%)
+                      </Text>
+                      {/* Mini Progress Bar */}
+                      <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${lecPct}%` }]} />
+                      </View>
+                    </View>
+                    <View style={styles.stepperGroup}>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleProgress(subj.id, { completed_lectures: -1 })
+                        }
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="remove" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleProgress(subj.id, { completed_lectures: 1 })
+                        }
+                        style={[styles.stepBtn, styles.stepBtnAdd]}
+                      >
+                        <Ionicons name="add" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* 2. DPPs */}
+                  <View style={styles.counterRow}>
+                    <View style={styles.counterInfo}>
+                      <View style={styles.labelWithTag}>
+                        <Ionicons name="document-text" size={15} color="#FFFFFF" />
+                        <Text style={styles.counterLabel}>DPPs Solved</Text>
+                      </View>
+                      <Text style={styles.counterStats}>
+                        {subj.completed_dpps} / {subj.total_dpps}{' '}
+                        {subj.total_dpps > 0 ? `(${dppPct}%)` : '(Unset)'}
+                      </Text>
+                      {/* Mini Progress Bar */}
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: `${dppPct}%`,
+                              backgroundColor: '#06B6D4',
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.stepperGroup}>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleProgress(subj.id, { completed_dpps: -1 })
+                        }
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="remove" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleProgress(subj.id, { completed_dpps: 1 })
+                        }
+                        style={[styles.stepBtn, styles.stepBtnAdd]}
+                      >
+                        <Ionicons name="add" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* 3. PYQs */}
+                  <View style={styles.counterRow}>
+                    <View style={styles.counterInfo}>
+                      <View style={styles.labelWithTag}>
+                        <Ionicons name="trophy" size={15} color="#FFFFFF" />
+                        <Text style={styles.counterLabel}>GATE PYQs Attempted</Text>
+                        {subj.pyqs_attempted > 0 && (
+                          <View style={styles.accBadge}>
+                            <Text style={styles.accBadgeText}>{accuracy}% Acc</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.counterStats}>
+                        {subj.pyqs_attempted} Attempted • {subj.pyqs_correct} Correct
+                      </Text>
+                    </View>
+                    <View style={styles.stepperGroup}>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleProgress(subj.id, { pyqs_attempted: -1 })
+                        }
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="remove" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleProgress(subj.id, {
+                            pyqs_attempted: 1,
+                            // Assume correct on quick log
+                          })
+                        }
+                        style={[styles.stepBtn, styles.stepBtnAdd]}
+                      >
+                        <Ionicons name="add" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
-              )}
-            </View>
-          );
-        })}
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+                {/* Make Active Shortcut if not #1 */}
+                {!isActive && (
+                  <TouchableOpacity
+                    onPress={() => handleMakeActive(subj.id)}
+                    style={styles.makeActiveBtn}
+                  >
+                    <Ionicons name="star" size={14} color="#FFD700" />
+                    <Text style={styles.makeActiveText}>SET AS ACTIVE SUBJECT</Text>
+                  </TouchableOpacity>
+                )}
+              </Card3D>
+            );
+          })}
 
-      {/* Edit Subject Counts Modal */}
-      <Modal
-        visible={editModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                Edit Counts: {editingSubj?.subject.name}
-              </Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Ionicons name="close" size={20} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
+          <View style={{ height: 40 }} />
+        </ScrollView>
 
-            <View style={styles.inputGroup}>
+        {/* Edit Subject Modal */}
+        <Modal visible={editModalVisible} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Edit Subject Parameters</Text>
+              <Text style={styles.modalSub}>{editingSubj?.name}</Text>
+
+              <Text style={styles.inputLabel}>Subject Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editName}
+                onChangeText={setEditName}
+                placeholderTextColor="#64748B"
+              />
+
               <Text style={styles.inputLabel}>Total Lectures</Text>
               <TextInput
                 style={styles.input}
                 value={editTotalLec}
                 onChangeText={setEditTotalLec}
                 keyboardType="numeric"
+                placeholderTextColor="#64748B"
               />
-            </View>
 
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Mark Count as Estimated?</Text>
-              <Switch
-                value={editIsEstimated}
-                onValueChange={setEditIsEstimated}
-                trackColor={{ false: '#232A3B', true: '#38BDF8' }}
-              />
-            </View>
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Is Lecture Count Estimated?</Text>
+                <Switch
+                  value={editIsEstimated}
+                  onValueChange={setEditIsEstimated}
+                  trackColor={{ false: '#334155', true: '#8B5CF6' }}
+                />
+              </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Total DPP Count (Leave blank if unset)</Text>
+              <Text style={styles.inputLabel}>Total DPP Sheets</Text>
               <TextInput
                 style={styles.input}
                 value={editTotalDpps}
                 onChangeText={setEditTotalDpps}
-                placeholder="Leave empty if unknown"
-                placeholderTextColor="#64748B"
                 keyboardType="numeric"
-              />
-            </View>
-
-            <TouchableOpacity style={styles.saveBtn} onPress={saveSubjectCounts}>
-              <Text style={styles.saveBtnText}>Save Subject Counts</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Add Custom Topic Modal */}
-      <Modal
-        visible={addTopicModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setAddTopicModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Custom Topic</Text>
-              <TouchableOpacity onPress={() => setAddTopicModalVisible(false)}>
-                <Ionicons name="close" size={20} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Topic Title</Text>
-              <TextInput
-                style={styles.input}
-                value={newTopicName}
-                onChangeText={setNewTopicName}
-                placeholder="e.g. Advanced Graph Traversals"
                 placeholderTextColor="#64748B"
               />
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Estimated Lecture Count</Text>
-              <TextInput
-                style={styles.input}
-                value={newTopicLecCount}
-                onChangeText={setNewTopicLecCount}
-                keyboardType="numeric"
-              />
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity
+                  onPress={() => setEditModalVisible(false)}
+                  style={styles.modalCancelBtn}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={saveEdit} style={styles.modalSaveBtn}>
+                  <Text style={styles.modalSaveText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <TouchableOpacity style={styles.saveBtn} onPress={handleCreateTopic}>
-              <Text style={styles.saveBtnText}>Create Topic & Lectures</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 }
@@ -421,265 +430,272 @@ export default function RoadmapScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0A0C10',
+    backgroundColor: Colors.dark.bg,
   },
   container: {
-    padding: 16,
+    flex: 1,
+    paddingHorizontal: 16,
   },
   header: {
-    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
   },
-  badgeRow: {
-    marginBottom: 6,
-  },
-  screenTitle: {
-    fontSize: 24,
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
     fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
-  screenSubtitle: {
-    fontSize: 13,
+  headerSubtitle: {
     color: '#94A3B8',
+    fontSize: 12,
     marginTop: 2,
   },
-  subjectCard: {
-    backgroundColor: '#131720',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    marginBottom: 12,
-    overflow: 'hidden',
+  subjectCountBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
-  subjectCardHeader: {
-    padding: 14,
+  subjectCountText: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  subjectTopRow: {
+  scrollList: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  cardWrapper: {
+    marginBottom: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  titleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
-  subjCodeBadge: {
-    backgroundColor: '#1E2536',
+  rankPill: {
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
-  },
-  subjCodeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#38BDF8',
-  },
-  subjName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  weekTag: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  badgesCol: {
-    alignItems: 'flex-end',
-  },
-  progBarBg: {
-    height: 4,
-    backgroundColor: '#1E2536',
-    borderRadius: 2,
-    marginTop: 10,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  progBarFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metricItem: {
-    fontSize: 12,
-    color: '#94A3B8',
-  },
-  metricBold: {
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  editBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#38BDF8',
-  },
-  topicsContainer: {
-    backgroundColor: '#0E1118',
-    borderTopWidth: 1,
-    borderColor: '#1E2536',
-    padding: 12,
-  },
-  topicHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  topicListHeader: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  addTopicBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  addTopicText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#38BDF8',
-  },
-  topicCard: {
-    backgroundColor: '#131720',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    marginBottom: 8,
-    overflow: 'hidden',
   },
-  topicHeader: {
-    padding: 10,
+  rankPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  nameWrap: {
+    flex: 1,
+  },
+  subjectName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  subjectCode: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  actionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  iconBtn: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countersContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
+  },
+  counterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  topicTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#F8FAFC',
+  counterInfo: {
+    flex: 1,
+    paddingRight: 10,
   },
-  topicSub: {
-    fontSize: 11,
-    color: '#64748B',
+  labelWithTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  counterLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  estBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  estBadgeText: {
+    color: '#FCD34D',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  accBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  accBadgeText: {
+    color: '#34D399',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  counterStats: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 12,
+    fontWeight: '600',
     marginTop: 2,
   },
-  topicRight: {
+  progressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 2,
+    marginTop: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+  },
+  stepperGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
-  lecturesList: {
-    borderTopWidth: 1,
-    borderColor: '#1E2536',
-    padding: 10,
-    backgroundColor: '#0D1017',
+  stepBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  noLecText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontStyle: 'italic',
+  stepBtnAdd: {
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
-  lectureItem: {
+  makeActiveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderColor: '#1A212E',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  lectureItemDone: {
-    opacity: 0.5,
+  makeActiveText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  lectureTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#F8FAFC',
-  },
-  lectureTitleDone: {
-    textDecorationLine: 'line-through',
-    color: '#94A3B8',
-  },
-  lectureDuration: {
-    fontSize: 10,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  modalOverlay: {
+  modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    padding: 20,
   },
   modalCard: {
-    backgroundColor: '#131720',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: Colors.dark.card,
+    borderRadius: 22,
     padding: 20,
-    borderTopWidth: 1,
-    borderColor: '#232A3B',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  inputGroup: {
-    marginBottom: 12,
+  modalSub: {
+    color: '#94A3B8',
+    fontSize: 13,
+    marginBottom: 16,
   },
   inputLabel: {
+    color: '#CBD5E1',
     fontSize: 12,
     fontWeight: '600',
-    color: '#94A3B8',
     marginBottom: 6,
+    marginTop: 8,
   },
   input: {
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#F8FAFC',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    padding: 12,
+    color: '#FFFFFF',
     fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   switchRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'space-between',
+    marginVertical: 12,
   },
   switchLabel: {
+    color: '#CBD5E1',
     fontSize: 13,
-    fontWeight: '500',
-    color: '#F8FAFC',
   },
-  saveBtn: {
-    backgroundColor: '#38BDF8',
-    borderRadius: 8,
-    paddingVertical: 14,
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 14,
     alignItems: 'center',
-    marginTop: 8,
   },
-  saveBtnText: {
-    fontSize: 14,
+  modalCancelText: {
+    color: '#94A3B8',
     fontWeight: '700',
-    color: '#0A0C10',
+  },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
-

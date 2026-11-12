@@ -81,8 +81,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     if (
       newSettings.notifications_enabled !== undefined ||
       newSettings.morning_reminder_time !== undefined ||
-      newSettings.revision_reminder_time !== undefined ||
-      newSettings.evening_reminder_time !== undefined
+      newSettings.night_reminder_time !== undefined
     ) {
       scheduleAppNotifications(updated).catch(() => {});
     }

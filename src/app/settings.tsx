@@ -18,8 +18,8 @@ import { useAppStore } from '../stores/appStore';
 import {
   exportDatabaseToJson,
   importDatabaseFromJson,
-  DatabaseBackup
 } from '../db/database';
+import { DatabaseBackup } from '../types';
 import { Badge } from '../components/Badge';
 
 export default function SettingsScreen() {
@@ -34,8 +34,7 @@ export default function SettingsScreen() {
   const [dailyRev, setDailyRev] = useState((settings?.daily_revision_minutes_target || 60).toString());
   const [notifEnabled, setNotifEnabled] = useState(settings?.notifications_enabled === 1);
   const [morningTime, setMorningTime] = useState(settings?.morning_reminder_time || '07:00');
-  const [revTime, setRevTime] = useState(settings?.revision_reminder_time || '14:00');
-  const [eveningTime, setEveningTime] = useState(settings?.evening_reminder_time || '22:00');
+  const [nightTime, setNightTime] = useState(settings?.night_reminder_time || '21:00');
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -52,8 +51,7 @@ export default function SettingsScreen() {
         daily_revision_minutes_target: parseInt(dailyRev, 10) || 60,
         notifications_enabled: notifEnabled ? 1 : 0,
         morning_reminder_time: morningTime.trim(),
-        revision_reminder_time: revTime.trim(),
-        evening_reminder_time: eveningTime.trim(),
+        night_reminder_time: nightTime.trim(),
       });
 
       triggerRefresh();
@@ -279,20 +277,11 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Afternoon Revision Due Alert (HH:MM)</Text>
+              <Text style={styles.label}>Night 9 PM Check-In Reminder (HH:MM)</Text>
               <TextInput
                 style={styles.input}
-                value={revTime}
-                onChangeText={setRevTime}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Evening Audit & Progress Review (HH:MM)</Text>
-              <TextInput
-                style={styles.input}
-                value={eveningTime}
-                onChangeText={setEveningTime}
+                value={nightTime}
+                onChangeText={setNightTime}
               />
             </View>
           </>

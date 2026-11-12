@@ -8,139 +8,99 @@ import {
   SafeAreaView,
   Modal,
   TextInput,
-  Alert,
-  Switch
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../stores/appStore';
 import {
+  getSubjectsInQueue,
   getPyqAttempts,
   logPyqAttempt,
-  getWeakTopics,
-  getMistakeLogs,
-  resolveMistake,
-  getAllSubjects,
-  getTopicsForSubject
 } from '../../db/database';
-import { Badge } from '../../components/Badge';
-import {
-  PyqAttempt,
-  WeakTopicAnalysis,
-  MistakeLog,
-  Subject,
-  Topic,
-  DifficultyLevel,
-  MistakeCategory
-} from '../../types';
+import { Subject, PyqAttempt, MistakeCategory, DifficultyLevel } from '../../types';
+import { Colors, Gradients } from '../../constants/theme';
+import { Card3D } from '../../components/Card3D';
 
 export default function PyqScreen() {
-  const { dataVersion, triggerRefresh, settings } = useAppStore();
+  const { dataVersion, triggerRefresh } = useAppStore();
 
-  const [attempts, setAttempts] = useState<(PyqAttempt & { subject_name: string; topic_name: string })[]>([]);
-  const [weakTopics, setWeakTopics] = useState<WeakTopicAnalysis[]>([]);
-  const [mistakes, setMistakes] = useState<(MistakeLog & { subject_name: string; topic_name: string })[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [activeTab, setActiveTab] = useState<'attempts' | 'weak' | 'mistakes'>('attempts');
+  const [attempts, setAttempts] = useState<PyqAttempt[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
 
-  // Log Question Modal State
+  // Modal State
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedSubjId, setSelectedSubjId] = useState('c_prog');
-  const [subjTopics, setSubjTopics] = useState<Topic[]>([]);
-  const [selectedTopicId, setSelectedTopicId] = useState('');
-  const [yearInput, setYearInput] = useState('2024');
-  const [qNumInput, setQNumInput] = useState('1');
+  const [selectedSubjId, setSelectedSubjId] = useState('cs_cp');
+  const [gateYear, setGateYear] = useState('2024');
+  const [qNumber, setQNumber] = useState('1');
   const [marks, setMarks] = useState<1 | 2>(1);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('Medium');
   const [isCorrect, setIsCorrect] = useState(true);
-  const [timeTakenMins, setTimeTakenMins] = useState('2');
+  const [timeMins, setTimeMins] = useState('2');
   const [mistakeCat, setMistakeCat] = useState<MistakeCategory>('Conceptual mistake');
-  const [explanation, setExplanation] = useState('');
+  const [notes, setNotes] = useState('');
 
   const loadData = async () => {
     try {
-      const [allAttempts, weakList, mistakeList, allSubjs] = await Promise.all([
-        getPyqAttempts(),
-        getWeakTopics(10),
-        getMistakeLogs(),
-        getAllSubjects()
+      const [subjList, attemptList] = await Promise.all([
+        getSubjectsInQueue(),
+        getPyqAttempts(50),
       ]);
-
-      setAttempts(allAttempts);
-      setWeakTopics(weakList);
-      setMistakes(mistakeList);
-      setSubjects(allSubjs);
-
-      if (allSubjs.length > 0) {
-        const top = await getTopicsForSubject(selectedSubjId || allSubjs[0].id);
-        setSubjTopics(top);
-        if (top.length > 0 && !selectedTopicId) {
-          setSelectedTopicId(top[0].id);
-        }
+      setSubjects(subjList);
+      setAttempts(attemptList);
+      if (subjList.length > 0 && !selectedSubjId) {
+        setSelectedSubjId(subjList[0].id);
       }
     } catch (e) {
-      console.error('Error loading PYQ screen:', e);
+      console.error(e);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [dataVersion, selectedSubjId])
+    }, [dataVersion])
   );
 
-  const handleSubjectChange = async (subjId: string) => {
-    setSelectedSubjId(subjId);
-    const top = await getTopicsForSubject(subjId);
-    setSubjTopics(top);
-    if (top.length > 0) {
-      setSelectedTopicId(top[0].id);
+  const triggerHaptic = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
-  const handleSaveAttempt = async () => {
-    if (!selectedTopicId) {
-      Alert.alert('Required', 'Please select a topic.');
-      return;
+  const handleSave = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      await logPyqAttempt({
+        subject_id: selectedSubjId,
+        gate_year: parseInt(gateYear, 10) || 2024,
+        question_number: parseInt(qNumber, 10) || 1,
+        marks,
+        difficulty,
+        is_correct: isCorrect,
+        time_taken_seconds: (parseInt(timeMins, 10) || 2) * 60,
+        mistake_category: isCorrect ? undefined : mistakeCat,
+        notes: notes.trim() || undefined,
+      });
+
+      setModalVisible(false);
+      setNotes('');
+      await loadData();
+      triggerRefresh();
+    } catch (e) {
+      console.error(e);
     }
-
-    const yearNum = parseInt(yearInput, 10) || 2024;
-    const qNum = parseInt(qNumInput, 10) || 1;
-    const timeSec = (parseFloat(timeTakenMins) || 2) * 60;
-
-    await logPyqAttempt({
-      gate_year: yearNum,
-      subject_id: selectedSubjId,
-      topic_id: selectedTopicId,
-      question_number: qNum,
-      marks,
-      difficulty,
-      is_correct: isCorrect,
-      time_taken_seconds: timeSec,
-      mistake_category: !isCorrect ? mistakeCat : null,
-      explanation: !isCorrect ? explanation.trim() : null
-    });
-
-    setModalVisible(false);
-    setExplanation('');
-    triggerRefresh();
-    await loadData();
-    Alert.alert('Attempt Recorded', 'GATE PYQ performance updated.');
   };
 
-  const handleResolveMistake = async (id: string, currentVal: number) => {
-    await resolveMistake(id, currentVal === 0 ? true : false);
-    triggerRefresh();
-    await loadData();
-  };
-
-  const totalAttempted = attempts.length;
-  const correctCount = attempts.filter((a) => a.is_correct === 1).length;
-  const accuracy = totalAttempted > 0 ? Math.round((correctCount / totalAttempted) * 100) : null;
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayAttempts = attempts.filter((a) => a.attempted_at.startsWith(todayStr)).length;
-  const todayTarget = settings?.daily_pyq_target || 20;
+  const totalAttempted = subjects.reduce((acc, s) => acc + s.pyqs_attempted, 0);
+  const totalCorrect = subjects.reduce((acc, s) => acc + s.pyqs_correct, 0);
+  const overallAcc = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -148,441 +108,271 @@ export default function PyqScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.screenTitle}>GATE PYQ Tracker</Text>
-            <Text style={styles.screenSub}>
-              Daily Target: {todayAttempts}/{todayTarget} Questions
+            <Text style={styles.headerTitle}>GATE PYQ Tracker</Text>
+            <Text style={styles.headerSubtitle}>
+              Target: 20 Questions/Day • Accuracy Analysis
             </Text>
           </View>
-
-          <TouchableOpacity style={styles.logBtn} onPress={() => setModalVisible(true)}>
-            <Ionicons name="add" size={16} color="#0A0C10" />
+          <TouchableOpacity
+            onPress={() => {
+              triggerHaptic();
+              setModalVisible(true);
+            }}
+            style={styles.logBtn}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
             <Text style={styles.logBtnText}>Log PYQ</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Quick Stats Banner */}
-        <View style={styles.statsBanner}>
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>ATTEMPTED</Text>
-            <Text style={styles.statVal}>{totalAttempted}</Text>
+        {/* Hero Stats Card */}
+        <Card3D gradient={Gradients.electricEmerald as any} style={styles.heroCard}>
+          <View style={styles.heroGrid}>
+            <View style={styles.heroCol}>
+              <Text style={styles.heroLabel}>TOTAL SOLVED</Text>
+              <Text style={styles.heroVal}>{totalAttempted}</Text>
+              <Text style={styles.heroSub}>Target 20/day</Text>
+            </View>
+            <View style={styles.heroDivider} />
+            <View style={styles.heroCol}>
+              <Text style={styles.heroLabel}>CORRECT</Text>
+              <Text style={styles.heroVal}>{totalCorrect}</Text>
+              <Text style={styles.heroSub}>Verified solutions</Text>
+            </View>
+            <View style={styles.heroDivider} />
+            <View style={styles.heroCol}>
+              <Text style={styles.heroLabel}>ACCURACY</Text>
+              <Text style={styles.heroVal}>{totalAttempted > 0 ? `${overallAcc}%` : 'N/A'}</Text>
+              <Text style={styles.heroSub}>Target {'>'}75%</Text>
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>CORRECT</Text>
-            <Text style={[styles.statVal, { color: '#10B981' }]}>{correctCount}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>ACCURACY</Text>
-            <Text style={[styles.statVal, { color: '#38BDF8' }]}>
-              {accuracy !== null ? `${accuracy}%` : 'Not Started'}
-            </Text>
-          </View>
-        </View>
+        </Card3D>
 
-        {/* Segmented Tab Selector */}
-        <View style={styles.segmentRow}>
+        {/* Tab Selector */}
+        <View style={styles.tabBar}>
           <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'attempts' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('attempts')}
+            onPress={() => setActiveTab('overview')}
+            style={[styles.tabBtn, activeTab === 'overview' && styles.tabBtnActive]}
           >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'attempts' && styles.segmentTextActive
-              ]}
-            >
-              Attempts ({attempts.length})
+            <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
+              Subject Performance
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'weak' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('weak')}
+            onPress={() => setActiveTab('history')}
+            style={[styles.tabBtn, activeTab === 'history' && styles.tabBtnActive]}
           >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'weak' && styles.segmentTextActive
-              ]}
-            >
-              Weak Topics ({weakTopics.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'mistakes' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('mistakes')}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'mistakes' && styles.segmentTextActive
-              ]}
-            >
-              Mistakes ({mistakes.filter((m) => m.is_resolved === 0).length})
+            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+              Recent Attempts ({attempts.length})
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Main Content Area */}
-        <ScrollView style={styles.contentList} contentContainerStyle={{ padding: 16 }}>
-          {/* TAB 1: Recent Attempts */}
-          {activeTab === 'attempts' && (
-            <>
-              {attempts.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="document-text-outline" size={36} color="#64748B" />
-                  <Text style={styles.emptyTitle}>No Recorded PYQ Attempts</Text>
-                  <Text style={styles.emptySub}>
-                    Log your daily 20 PYQ questions. Accuracy is only calculated from real attempts.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.emptyLogBtn}
-                    onPress={() => setModalVisible(true)}
+        <ScrollView style={styles.scrollList} showsVerticalScrollIndicator={false}>
+          {activeTab === 'overview' ? (
+            /* Subject Breakdown */
+            <View style={styles.subjectList}>
+              {subjects.map((subj) => {
+                const acc =
+                  subj.pyqs_attempted > 0
+                    ? Math.round((subj.pyqs_correct / subj.pyqs_attempted) * 100)
+                    : 0;
+
+                return (
+                  <Card3D
+                    key={subj.id}
+                    gradient={[subj.gradient_start, subj.gradient_end] as any}
+                    style={styles.subjCard}
                   >
-                    <Text style={styles.emptyLogBtnText}>Record First Question</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                attempts.map((a) => (
-                  <View key={a.id} style={styles.attemptCard}>
-                    <View style={styles.attemptLeft}>
-                      <View
-                        style={[
-                          styles.resultIndicator,
-                          { backgroundColor: a.is_correct === 1 ? '#10B981' : '#F43F5E' }
-                        ]}
-                      >
-                        <Ionicons
-                          name={a.is_correct === 1 ? 'checkmark' : 'close'}
-                          size={14}
-                          color="#FFFFFF"
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.attemptTitle}>
-                          GATE {a.gate_year} • Q{a.question_number} ({a.marks} Mark)
-                        </Text>
-                        <Text style={styles.attemptTopic}>
-                          {a.subject_name} • {a.topic_name}
-                        </Text>
-                        {a.mistake_category && (
-                          <Text style={styles.attemptMistake}>
-                            Reason: {a.mistake_category}
+                    <View style={styles.subjRow}>
+                      <View style={styles.subjLeft}>
+                        <Ionicons name={subj.icon as any} size={20} color="#FFFFFF" />
+                        <View>
+                          <Text style={styles.subjName}>{subj.name}</Text>
+                          <Text style={styles.subjMeta}>
+                            {subj.pyqs_attempted} Attempted • {subj.pyqs_correct} Correct
                           </Text>
-                        )}
+                        </View>
+                      </View>
+                      <View style={styles.accBadge}>
+                        <Text style={styles.accVal}>
+                          {subj.pyqs_attempted > 0 ? `${acc}%` : 'Not Started'}
+                        </Text>
                       </View>
                     </View>
-
-                    <View style={styles.attemptRight}>
-                      <Badge label={a.difficulty} variant="neutral" size="sm" />
-                      <Text style={styles.attemptTimeText}>
-                        {Math.round(a.time_taken_seconds / 60)}m {a.time_taken_seconds % 60}s
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </>
-          )}
-
-          {/* TAB 2: Weak Topics */}
-          {activeTab === 'weak' && (
-            <>
-              <View style={styles.weakInfoBox}>
-                <Ionicons name="information-circle-outline" size={16} color="#38BDF8" />
-                <Text style={styles.weakInfoText}>
-                  Topics with accuracy below 50% are Critical. Focus revision and re-practice here.
-                </Text>
-              </View>
-
-              {weakTopics.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="shield-checkmark-outline" size={36} color="#10B981" />
-                  <Text style={styles.emptyTitle}>No Critical Weak Topics Yet</Text>
-                  <Text style={styles.emptySub}>
-                    Requires at least 3 attempts per topic to establish statistically sound weakness metrics.
-                  </Text>
+                  </Card3D>
+                );
+              })}
+            </View>
+          ) : (
+            /* History List */
+            <View style={styles.historyList}>
+              {attempts.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📝</Text>
+                  <Text style={styles.emptyText}>No PYQs logged yet today</Text>
+                  <Text style={styles.emptySub}>Tap 'Log PYQ' to record your first question!</Text>
                 </View>
               ) : (
-                weakTopics.map((w) => (
-                  <View key={w.topic_id} style={styles.weakCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.weakCardTopic}>{w.topic_name}</Text>
-                      <Text style={styles.weakCardSubj}>{w.subject_name}</Text>
-                      <Text style={styles.weakCardStats}>
-                        {w.correct_attempts}/{w.total_attempts} Correct Answers
-                      </Text>
+                attempts.map((att) => {
+                  const subj = subjects.find((s) => s.id === att.subject_id);
+                  return (
+                    <View key={att.id} style={styles.historyCard}>
+                      <View style={styles.historyRow}>
+                        <View style={styles.historyLeft}>
+                          <Ionicons
+                            name={att.is_correct === 1 ? 'checkmark-circle' : 'close-circle'}
+                            size={22}
+                            color={att.is_correct === 1 ? '#10B981' : '#F43F5E'}
+                          />
+                          <View>
+                            <Text style={styles.historyTitle}>
+                              GATE {att.gate_year} • Q{att.question_number} ({att.marks}M)
+                            </Text>
+                            <Text style={styles.historySubj}>{subj?.name || att.subject_id}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.historyRight}>
+                          <Text style={styles.historyTime}>
+                            {Math.round(att.time_taken_seconds / 60)}m
+                          </Text>
+                          {att.mistake_category && (
+                            <Text style={styles.mistakeTag}>{att.mistake_category}</Text>
+                          )}
+                        </View>
+                      </View>
+                      {att.notes && <Text style={styles.historyNotes}>{att.notes}</Text>}
                     </View>
-
-                    <View style={styles.weakCardRight}>
-                      <Badge
-                        label={w.status.toUpperCase()}
-                        variant={w.status === 'Critical' ? 'danger' : 'warning'}
-                      />
-                      <Text style={styles.weakAccBig}>{w.accuracy}%</Text>
-                    </View>
-                  </View>
-                ))
+                  );
+                })
               )}
-            </>
-          )}
-
-          {/* TAB 3: Mistake Log Taxonomy */}
-          {activeTab === 'mistakes' && (
-            <>
-              {mistakes.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="happy-outline" size={36} color="#10B981" />
-                  <Text style={styles.emptyTitle}>Zero Unresolved Mistakes</Text>
-                  <Text style={styles.emptySub}>
-                    Incorrect questions are cataloged here into conceptual, calculation, silly, or time management errors.
-                  </Text>
-                </View>
-              ) : (
-                mistakes.map((m) => (
-                  <View
-                    key={m.id}
-                    style={[styles.mistakeCard, m.is_resolved === 1 && styles.mistakeCardResolved]}
-                  >
-                    <View style={styles.mistakeTopRow}>
-                      <Badge label={m.mistake_category} variant="danger" size="sm" />
-                      <TouchableOpacity
-                        style={[
-                          styles.resolveBtn,
-                          m.is_resolved === 1 && styles.resolveBtnDone
-                        ]}
-                        onPress={() => handleResolveMistake(m.id, m.is_resolved)}
-                      >
-                        <Ionicons
-                          name={m.is_resolved === 1 ? 'checkmark-circle' : 'ellipse-outline'}
-                          size={14}
-                          color={m.is_resolved === 1 ? '#10B981' : '#94A3B8'}
-                        />
-                        <Text
-                          style={[
-                            styles.resolveBtnText,
-                            m.is_resolved === 1 && { color: '#10B981' }
-                          ]}
-                        >
-                          {m.is_resolved === 1 ? 'Resolved' : 'Mark Resolved'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={styles.mistakeExpl}>{m.explanation}</Text>
-                    <Text style={styles.mistakeSubjTopic}>
-                      {m.subject_name} • {m.topic_name}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </>
+            </View>
           )}
 
           <View style={{ height: 40 }} />
         </ScrollView>
-      </View>
 
-      {/* Log PYQ Attempt Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Record GATE PYQ Attempt</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={22} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Subject Selector */}
-            <Text style={styles.modalLabel}>Select Subject</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hScroll}>
-              {subjects.map((s) => (
-                <TouchableOpacity
-                  key={s.id}
-                  style={[styles.subjPill, selectedSubjId === s.id && styles.subjPillActive]}
-                  onPress={() => handleSubjectChange(s.id)}
-                >
-                  <Text
-                    style={[
-                      styles.subjPillText,
-                      selectedSubjId === s.id && styles.subjPillTextActive
-                    ]}
-                  >
-                    {s.code}
-                  </Text>
+        {/* Log PYQ Modal */}
+        <Modal visible={modalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Log GATE PYQ Question</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={22} color="#FFFFFF" />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Topic Selector */}
-            <Text style={styles.modalLabel}>Select Topic</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hScroll}>
-              {subjTopics.map((t) => (
-                <TouchableOpacity
-                  key={t.id}
-                  style={[styles.subjPill, selectedTopicId === t.id && styles.subjPillActive]}
-                  onPress={() => setSelectedTopicId(t.id)}
-                >
-                  <Text
-                    style={[
-                      styles.subjPillText,
-                      selectedTopicId === t.id && styles.subjPillTextActive
-                    ]}
-                  >
-                    {t.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Year & Question Number */}
-            <View style={styles.inputsRow}>
-              <View style={styles.inputCol}>
-                <Text style={styles.modalLabel}>GATE Year</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={yearInput}
-                  onChangeText={setYearInput}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={styles.inputCol}>
-                <Text style={styles.modalLabel}>Question #</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={qNumInput}
-                  onChangeText={setQNumInput}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Marks & Difficulty */}
-            <View style={styles.inputsRow}>
-              <View style={styles.inputCol}>
-                <Text style={styles.modalLabel}>Marks</Text>
-                <View style={styles.btnGroup}>
-                  <TouchableOpacity
-                    style={[styles.groupBtn, marks === 1 && styles.groupBtnActive]}
-                    onPress={() => setMarks(1)}
-                  >
-                    <Text style={[styles.groupBtnText, marks === 1 && styles.groupBtnTextActive]}>
-                      1 Mark
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.groupBtn, marks === 2 && styles.groupBtnActive]}
-                    onPress={() => setMarks(2)}
-                  >
-                    <Text style={[styles.groupBtnText, marks === 2 && styles.groupBtnTextActive]}>
-                      2 Marks
-                    </Text>
-                  </TouchableOpacity>
-                </View>
               </View>
 
-              <View style={styles.inputCol}>
-                <Text style={styles.modalLabel}>Difficulty</Text>
-                <View style={styles.btnGroup}>
-                  {(['Easy', 'Medium', 'Hard'] as DifficultyLevel[]).map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      style={[styles.groupBtn, difficulty === d && styles.groupBtnActive]}
-                      onPress={() => setDifficulty(d)}
-                    >
-                      <Text style={[styles.groupBtnText, difficulty === d && styles.groupBtnTextActive]}>
-                        {d}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            {/* Correct Switch */}
-            <View style={styles.switchRow}>
-              <Text style={styles.switchText}>
-                Result:{' '}
-                <Text style={{ color: isCorrect ? '#10B981' : '#F43F5E', fontWeight: '800' }}>
-                  {isCorrect ? 'CORRECT' : 'INCORRECT'}
-                </Text>
-              </Text>
-              <Switch
-                value={isCorrect}
-                onValueChange={setIsCorrect}
-                trackColor={{ false: '#F43F5E', true: '#10B981' }}
-              />
-            </View>
-
-            {/* Time Taken */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.modalLabel}>Time Taken (Minutes)</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={timeTakenMins}
-                onChangeText={setTimeTakenMins}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            {/* Mistake Taxonomy if Incorrect */}
-            {!isCorrect && (
-              <View style={styles.mistakeTaxonomyBox}>
-                <Text style={styles.modalLabel}>Error Classification</Text>
-                <View style={styles.catWrap}>
-                  {[
-                    'Conceptual mistake',
-                    'Calculation mistake',
-                    'Silly mistake',
-                    'Question misunderstood',
-                    'Time management issue'
-                  ].map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.catChoice,
-                        mistakeCat === cat && styles.catChoiceActive
-                      ]}
-                      onPress={() => setMistakeCat(cat as MistakeCategory)}
-                    >
-                      <Text
-                        style={[
-                          styles.catChoiceText,
-                          mistakeCat === cat && styles.catChoiceTextActive
-                        ]}
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <Text style={styles.fieldLabel}>Subject</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+                  {subjects.map((s) => {
+                    const sel = s.id === selectedSubjId;
+                    return (
+                      <TouchableOpacity
+                        key={s.id}
+                        onPress={() => setSelectedSubjId(s.id)}
+                        style={[styles.subjectChip, sel && { backgroundColor: s.color }]}
                       >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text style={[styles.chipText, sel && { color: '#FFFFFF', fontWeight: '700' }]}>
+                          {s.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                <View style={styles.twoCol}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>GATE Year</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={gateYear}
+                      onChangeText={setGateYear}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Question Number</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={qNumber}
+                      onChangeText={setQNumber}
+                      keyboardType="numeric"
+                    />
+                  </View>
                 </View>
 
-                <Text style={styles.modalLabel}>Mistake Explanation / Root Cause</Text>
-                <TextInput
-                  style={[styles.modalInput, { height: 60 }]}
-                  value={explanation}
-                  onChangeText={setExplanation}
-                  placeholder="Why was it missed? What formula/concept was overlooked?"
-                  placeholderTextColor="#64748B"
-                  multiline
-                />
-              </View>
-            )}
+                {/* Result: Correct or Incorrect */}
+                <Text style={styles.fieldLabel}>Result</Text>
+                <View style={styles.resultRow}>
+                  <TouchableOpacity
+                    onPress={() => setIsCorrect(true)}
+                    style={[styles.resultBtn, isCorrect && styles.correctActive]}
+                  >
+                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                    <Text style={styles.resultBtnText}>Correct (+{marks})</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setIsCorrect(false)}
+                    style={[styles.resultBtn, !isCorrect && styles.incorrectActive]}
+                  >
+                    <Ionicons name="close" size={18} color="#FFFFFF" />
+                    <Text style={styles.resultBtnText}>Incorrect</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <TouchableOpacity style={styles.saveAttemptBtn} onPress={handleSaveAttempt}>
-              <Text style={styles.saveAttemptBtnText}>Save Attempt Record</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </Modal>
+                {/* If incorrect, show mistake category */}
+                {!isCorrect && (
+                  <>
+                    <Text style={styles.fieldLabel}>Mistake Category</Text>
+                    {[
+                      'Conceptual mistake',
+                      'Calculation mistake',
+                      'Silly mistake',
+                      'Question misunderstood',
+                      'Time management issue',
+                    ].map((cat) => {
+                      const sel = cat === mistakeCat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          onPress={() => setMistakeCat(cat as MistakeCategory)}
+                          style={[styles.catOption, sel && styles.catOptionActive]}
+                        >
+                          <Ionicons
+                            name={sel ? 'radio-button-on' : 'radio-button-off'}
+                            size={16}
+                            color={sel ? '#F43F5E' : '#64748B'}
+                          />
+                          <Text style={[styles.catText, sel && { color: '#FFFFFF', fontWeight: '700' }]}>
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                )}
+
+                <Text style={styles.fieldLabel}>Notes / Formula Learned</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Key trap or concept in this question..."
+                  placeholderTextColor="#64748B"
+                  value={notes}
+                  onChangeText={setNotes}
+                />
+
+                <TouchableOpacity onPress={handleSave} style={styles.submitBtn}>
+                  <Text style={styles.submitBtnText}>Save PYQ Attempt</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 20 }} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 }
@@ -590,448 +380,338 @@ export default function PyqScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0A0C10',
+    backgroundColor: Colors.dark.bg,
   },
   container: {
     flex: 1,
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
   },
-  screenTitle: {
+  headerTitle: {
+    color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '800',
-    color: '#F8FAFC',
     letterSpacing: -0.4,
   },
-  screenSub: {
+  headerSubtitle: {
+    color: '#94A3B8',
     fontSize: 12,
-    color: '#38BDF8',
-    fontWeight: '600',
     marginTop: 2,
   },
   logBtn: {
-    backgroundColor: '#38BDF8',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#10B981',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   logBtnText: {
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0A0C10',
+    fontWeight: '800',
   },
-  statsBanner: {
+  heroCard: {
+    marginBottom: 14,
+    borderRadius: 20,
+  },
+  heroGrid: {
     flexDirection: 'row',
-    backgroundColor: '#131720',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#232A3B',
-    paddingVertical: 12,
-    marginHorizontal: 16,
-    borderRadius: 10,
-    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
   },
-  statBox: {
+  heroCol: {
     flex: 1,
     alignItems: 'center',
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#232A3B',
-  },
-  statLabel: {
+  heroLabel: {
+    color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 10,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
-  statVal: {
-    fontSize: 18,
+  heroVal: {
+    color: '#FFFFFF',
+    fontSize: 22,
     fontWeight: '800',
-    color: '#F8FAFC',
-    marginTop: 2,
+    marginVertical: 4,
   },
-  segmentRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-  },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 6,
-    backgroundColor: '#131720',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-  },
-  segmentBtnActive: {
-    backgroundColor: '#1E2536',
-    borderColor: '#38BDF8',
-  },
-  segmentText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  segmentTextActive: {
-    color: '#38BDF8',
-  },
-  contentList: {
-    flex: 1,
-  },
-  attemptCard: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  attemptLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 10,
-  },
-  resultIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  attemptTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  attemptTopic: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  attemptMistake: {
-    fontSize: 11,
-    color: '#F43F5E',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  attemptRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  attemptTimeText: {
+  heroSub: {
+    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 10,
-    color: '#64748B',
-  },
-  weakInfoBox: {
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.2)',
-    borderRadius: 8,
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  weakInfoText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    flex: 1,
-    lineHeight: 16,
-  },
-  weakCard: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  weakCardTopic: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  weakCardSubj: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  weakCardStats: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  weakCardRight: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  weakAccBig: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#F43F5E',
-  },
-  mistakeCard: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 14,
-    marginBottom: 8,
-  },
-  mistakeCardResolved: {
-    opacity: 0.6,
-  },
-  mistakeTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  resolveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-  },
-  resolveBtnDone: {
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  },
-  resolveBtnText: {
-    fontSize: 11,
     fontWeight: '600',
-    color: '#94A3B8',
   },
-  mistakeExpl: {
-    fontSize: 13,
-    color: '#F8FAFC',
-    lineHeight: 18,
-    marginBottom: 6,
+  heroDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  mistakeSubjTopic: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  emptyCard: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 24,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginTop: 10,
-  },
-  emptySub: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 4,
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    padding: 4,
     marginBottom: 14,
   },
-  emptyLogBtn: {
-    backgroundColor: '#38BDF8',
-    borderRadius: 8,
+  tabBtn: {
+    flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderRadius: 10,
   },
-  emptyLogBtnText: {
-    fontSize: 13,
+  tabBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  tabText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  scrollList: {
+    flex: 1,
+  },
+  subjectList: {
+    gap: 12,
+  },
+  subjCard: {
+    borderRadius: 18,
+  },
+  subjRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subjLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  subjName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  subjMeta: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  accBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  accVal: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  historyList: {
+    gap: 10,
+  },
+  historyCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  historyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  historyTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  historySubj: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  historyRight: {
+    alignItems: 'flex-end',
+  },
+  historyTime: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  mistakeTag: {
+    color: '#F43F5E',
+    fontSize: 10,
     fontWeight: '700',
-    color: '#0A0C10',
+    marginTop: 2,
+  },
+  historyNotes: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptySub: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'flex-end',
   },
-  modalCard: {
-    backgroundColor: '#131720',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-    borderTopWidth: 1,
-    borderColor: '#232A3B',
+  modalBox: {
+    backgroundColor: Colors.dark.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 20,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  modalLabel: {
+  modalBody: {
+    paddingBottom: 20,
+  },
+  fieldLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  chipRow: {
+    marginBottom: 10,
+  },
+  subjectChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  chipText: {
+    color: '#CBD5E1',
     fontSize: 12,
     fontWeight: '600',
-    color: '#94A3B8',
-    marginBottom: 6,
   },
-  hScroll: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  subjPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    marginRight: 6,
-  },
-  subjPillActive: {
-    backgroundColor: '#38BDF8',
-    borderColor: '#38BDF8',
-  },
-  subjPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  subjPillTextActive: {
-    color: '#0A0C10',
-  },
-  inputsRow: {
+  twoCol: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 12,
   },
-  inputCol: {
-    flex: 1,
-  },
-  modalInput: {
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#F8FAFC',
-    fontSize: 14,
-  },
-  btnGroup: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  groupBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    alignItems: 'center',
-  },
-  groupBtnActive: {
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-  },
-  groupBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  groupBtnTextActive: {
-    color: '#38BDF8',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#1E2536',
-    marginVertical: 10,
-  },
-  switchText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F8FAFC',
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  mistakeTaxonomyBox: {
-    backgroundColor: '#171C28',
-    borderRadius: 8,
+  textInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
     padding: 12,
-    marginBottom: 14,
+    color: '#FFFFFF',
+    fontSize: 14,
     borderWidth: 1,
-    borderColor: '#232A3B',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  catWrap: {
+  resultRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    gap: 12,
     marginBottom: 10,
   },
-  catChoice: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    backgroundColor: '#131720',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-  },
-  catChoiceActive: {
-    borderColor: '#F43F5E',
-    backgroundColor: 'rgba(244, 63, 94, 0.15)',
-  },
-  catChoiceText: {
-    fontSize: 11,
-    color: '#94A3B8',
-  },
-  catChoiceTextActive: {
-    color: '#F43F5E',
-    fontWeight: '700',
-  },
-  saveAttemptBtn: {
-    backgroundColor: '#38BDF8',
-    borderRadius: 8,
-    paddingVertical: 14,
+  resultBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 10,
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  saveAttemptBtnText: {
-    fontSize: 15,
+  correctActive: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  incorrectActive: {
+    backgroundColor: '#F43F5E',
+    borderColor: '#F43F5E',
+  },
+  resultBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
-    color: '#0A0C10',
+  },
+  catOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginBottom: 6,
+  },
+  catOptionActive: {
+    backgroundColor: 'rgba(244, 63, 94, 0.2)',
+  },
+  catText: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  submitBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
-

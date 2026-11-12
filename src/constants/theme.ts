@@ -1,28 +1,46 @@
+export const Gradients = {
+  cyberViolet: ['#8B5CF6', '#6366F1', '#EC4899'] as const,
+  sunsetBlaze: ['#FF512F', '#F09819', '#DD2476'] as const,
+  oceanCyan: ['#06B6D4', '#3B82F6', '#1D4ED8'] as const,
+  electricEmerald: ['#10B981', '#059669', '#047857'] as const,
+  solarGold: ['#F59E0B', '#EF4444', '#DC2626'] as const,
+  neonPurple: ['#A855F7', '#7C3AED', '#4F46E5'] as const,
+  cardGlassDark: ['rgba(25, 30, 45, 0.85)', 'rgba(15, 18, 28, 0.95)'] as const,
+  cardGlassLight: ['rgba(255, 255, 255, 0.95)', 'rgba(241, 245, 249, 0.90)'] as const,
+  glareOverlay: ['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0.0)'] as const,
+};
+
 export const Colors = {
   dark: {
-    bg: '#0A0C10',
-    card: '#131720',
-    surface: '#171C28',
-    surfaceLight: '#1F2636',
-    border: '#232A3B',
-    borderSubtle: '#19202E',
+    bg: '#080A10',
+    card: '#111522',
+    surface: '#161C2E',
+    surfaceLight: '#1E263D',
+    border: 'rgba(255, 255, 255, 0.10)',
+    borderSubtle: 'rgba(255, 255, 255, 0.05)',
+    borderGlow: 'rgba(99, 102, 241, 0.4)',
     text: '#F8FAFC',
     textMuted: '#94A3B8',
     textSubtle: '#64748B',
-    primary: '#38BDF8', // Cyan / Sky
-    primarySoft: 'rgba(56, 189, 248, 0.12)',
+    primary: '#38BDF8', // Cyan
+    primarySoft: 'rgba(56, 189, 248, 0.15)',
     secondary: '#818CF8', // Indigo
-    secondarySoft: 'rgba(129, 140, 248, 0.12)',
+    secondarySoft: 'rgba(129, 140, 248, 0.15)',
     success: '#10B981', // Emerald
-    successSoft: 'rgba(16, 185, 129, 0.12)',
+    successSoft: 'rgba(16, 185, 129, 0.15)',
     warning: '#F59E0B', // Amber
-    warningSoft: 'rgba(245, 158, 11, 0.12)',
+    warningSoft: 'rgba(245, 158, 11, 0.15)',
     danger: '#F43F5E', // Rose
-    dangerSoft: 'rgba(244, 63, 94, 0.12)',
+    dangerSoft: 'rgba(244, 63, 94, 0.15)',
     accent: '#A855F7', // Purple
-    accentSoft: 'rgba(168, 85, 247, 0.12)',
-    navBg: '#0D1017',
-    tabBarBorder: '#1A212E',
+    accentSoft: 'rgba(168, 85, 247, 0.15)',
+    neonFlame: '#FF512F',
+    neonCyan: '#06B6D4',
+    neonEmerald: '#10B981',
+    neonViolet: '#8B5CF6',
+    neonGold: '#F59E0B',
+    navBg: '#090C14',
+    tabBarBorder: 'rgba(255, 255, 255, 0.08)',
     statusBar: 'light-content' as const,
   },
   light: {
@@ -32,21 +50,27 @@ export const Colors = {
     surfaceLight: '#E2E8F0',
     border: '#E2E8F0',
     borderSubtle: '#F1F5F9',
+    borderGlow: 'rgba(99, 102, 241, 0.25)',
     text: '#0F172A',
     textMuted: '#475569',
     textSubtle: '#94A3B8',
     primary: '#0284C7',
-    primarySoft: 'rgba(2, 132, 199, 0.10)',
+    primarySoft: 'rgba(2, 132, 199, 0.12)',
     secondary: '#4F46E5',
-    secondarySoft: 'rgba(79, 70, 229, 0.10)',
+    secondarySoft: 'rgba(79, 70, 229, 0.12)',
     success: '#059669',
-    successSoft: 'rgba(5, 150, 105, 0.10)',
+    successSoft: 'rgba(5, 150, 105, 0.12)',
     warning: '#D97706',
-    warningSoft: 'rgba(217, 119, 6, 0.10)',
+    warningSoft: 'rgba(217, 119, 6, 0.12)',
     danger: '#E11D48',
-    dangerSoft: 'rgba(225, 29, 72, 0.10)',
+    dangerSoft: 'rgba(225, 29, 72, 0.12)',
     accent: '#7C3AED',
-    accentSoft: 'rgba(124, 58, 237, 0.10)',
+    accentSoft: 'rgba(124, 58, 237, 0.12)',
+    neonFlame: '#E11D48',
+    neonCyan: '#0284C7',
+    neonEmerald: '#059669',
+    neonViolet: '#7C3AED',
+    neonGold: '#D97706',
     navBg: '#FFFFFF',
     tabBarBorder: '#E2E8F0',
     statusBar: 'dark-content' as const,
@@ -58,7 +82,7 @@ export type ThemeColors = typeof Colors.dark;
 export const Typography = {
   h1: {
     fontSize: 28,
-    fontWeight: '700' as const,
+    fontWeight: '800' as const,
     letterSpacing: -0.6,
   },
   h2: {
@@ -68,36 +92,76 @@ export const Typography = {
   },
   h3: {
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
     letterSpacing: -0.2,
-  },
-  h4: {
-    fontSize: 16,
-    fontWeight: '600' as const,
   },
   body: {
     fontSize: 15,
     fontWeight: '400' as const,
     lineHeight: 22,
   },
-  bodySmall: {
-    fontSize: 13,
-    fontWeight: '400' as const,
-    lineHeight: 18,
+  bodyBold: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    lineHeight: 22,
   },
   caption: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500' as const,
     letterSpacing: 0.2,
   },
-  metric: {
-    fontSize: 32,
+  captionBold: {
+    fontSize: 12,
     fontWeight: '700' as const,
-    letterSpacing: -0.8,
+    letterSpacing: 0.5,
   },
-  metricLarge: {
-    fontSize: 44,
-    fontWeight: '800' as const,
-    letterSpacing: -1.2,
+  micro: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase' as const,
+  },
+  mono: {
+    fontFamily: 'Courier',
+    fontSize: 14,
+    fontWeight: '600' as const,
+  }
+};
+
+export const Shadows = {
+  glowCyan: {
+    shadowColor: '#06B6D4',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  glowViolet: {
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  glowFlame: {
+    shadowColor: '#FF512F',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  glowEmerald: {
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  card3D: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 12,
   }
 };

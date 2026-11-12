@@ -1,0 +1,491 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { Subject, DailyGoal } from '../types';
+import { getSubjectsInQueue, saveMorningGoals } from '../db/database';
+import { Colors, Gradients } from '../constants/theme';
+import { Card3D } from './Card3D';
+
+interface MorningTargetModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSaved: (goal: DailyGoal) => void;
+  currentGoal?: DailyGoal | null;
+}
+
+export function MorningTargetModal({
+  visible,
+  onClose,
+  onSaved,
+  currentGoal,
+}: MorningTargetModalProps) {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('cs_cp');
+  const [targetLectures, setTargetLectures] = useState<number>(5);
+  const [targetDpps, setTargetDpps] = useState<number>(2);
+  const [targetPyqs, setTargetPyqs] = useState<number>(20);
+  const [targetHours, setTargetHours] = useState<number>(8);
+
+  useEffect(() => {
+    if (visible) {
+      loadSubjects();
+      if (currentGoal) {
+        setTargetLectures(currentGoal.target_lectures);
+        setTargetDpps(currentGoal.target_dpps);
+        setTargetPyqs(currentGoal.target_pyqs);
+        setTargetHours(Math.round(currentGoal.target_study_minutes / 60));
+        if (currentGoal.focus_subject_id) {
+          setSelectedSubjectId(currentGoal.focus_subject_id);
+        }
+      }
+    }
+  }, [visible, currentGoal]);
+
+  const loadSubjects = async () => {
+    try {
+      const list = await getSubjectsInQueue();
+      setSubjects(list);
+      if (list.length > 0 && !currentGoal?.focus_subject_id) {
+        setSelectedSubjectId(list[0].id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      const goal = await saveMorningGoals({
+        target_lectures: targetLectures,
+        target_dpps: targetDpps,
+        target_pyqs: targetPyqs,
+        target_study_minutes: targetHours * 60,
+        focus_subject_id: selectedSubjectId,
+      });
+      onSaved(goal);
+      onClose();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const triggerHaptic = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.overlay}>
+        <View style={styles.modalContainer}>
+          {/* Header */}
+          <LinearGradient
+            colors={Gradients.sunsetBlaze as any}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.headerGradient}
+          >
+            <View style={styles.headerRow}>
+              <View style={styles.headerTitleWrap}>
+                <Text style={styles.headerIcon}>🌅</Text>
+                <View>
+                  <Text style={styles.headerTitle}>Morning Kickoff</Text>
+                  <Text style={styles.headerSubtitle}>Set today's GATE preparation target</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+
+          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+            {/* Focus Subject Picker */}
+            <Text style={styles.sectionTitle}>1. FOCUS SUBJECT (TOP OF QUEUE)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectScroll}>
+              {subjects.map((subj) => {
+                const isSelected = subj.id === selectedSubjectId;
+                return (
+                  <TouchableOpacity
+                    key={subj.id}
+                    onPress={() => {
+                      triggerHaptic();
+                      setSelectedSubjectId(subj.id);
+                    }}
+                    style={[
+                      styles.subjectChip,
+                      isSelected && {
+                        backgroundColor: subj.color,
+                        borderColor: '#FFFFFF',
+                        shadowColor: subj.color,
+                        shadowOpacity: 0.6,
+                        shadowRadius: 10,
+                        elevation: 6,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={subj.icon as any}
+                      size={18}
+                      color={isSelected ? '#FFFFFF' : subj.color}
+                    />
+                    <Text
+                      style={[
+                        styles.subjectChipText,
+                        isSelected && { color: '#FFFFFF', fontWeight: '700' },
+                      ]}
+                    >
+                      {subj.name}
+                    </Text>
+                    {subj.queue_order === 1 && (
+                      <View style={styles.rankBadge}>
+                        <Text style={styles.rankBadgeText}>#1</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Target 1: Lectures */}
+            <Card3D gradient={Gradients.cyberViolet as any} style={styles.targetCard}>
+              <View style={styles.targetRow}>
+                <View style={styles.targetInfo}>
+                  <Text style={styles.targetLabel}>PW LECTURES</Text>
+                  <Text style={styles.targetSub}>Watch & understand concepts</Text>
+                </View>
+                <View style={styles.counterRow}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetLectures((v) => Math.max(1, v - 1));
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="remove" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <Text style={styles.counterValue}>{targetLectures}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetLectures((v) => v + 1);
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card3D>
+
+            {/* Target 2: DPP */}
+            <Card3D gradient={Gradients.oceanCyan as any} style={styles.targetCard}>
+              <View style={styles.targetRow}>
+                <View style={styles.targetInfo}>
+                  <Text style={styles.targetLabel}>DPP EXERCISES</Text>
+                  <Text style={styles.targetSub}>Daily practice problem sheets</Text>
+                </View>
+                <View style={styles.counterRow}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetDpps((v) => Math.max(0, v - 1));
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="remove" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <Text style={styles.counterValue}>{targetDpps}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetDpps((v) => v + 1);
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card3D>
+
+            {/* Target 3: PYQ */}
+            <Card3D gradient={Gradients.electricEmerald as any} style={styles.targetCard}>
+              <View style={styles.targetRow}>
+                <View style={styles.targetInfo}>
+                  <Text style={styles.targetLabel}>GATE PYQS</Text>
+                  <Text style={styles.targetSub}>Previous years questions</Text>
+                </View>
+                <View style={styles.counterRow}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetPyqs((v) => Math.max(5, v - 5));
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="remove" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <Text style={styles.counterValue}>{targetPyqs}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetPyqs((v) => v + 5);
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card3D>
+
+            {/* Target 4: Study Hours */}
+            <Card3D gradient={Gradients.solarGold as any} style={styles.targetCard}>
+              <View style={styles.targetRow}>
+                <View style={styles.targetInfo}>
+                  <Text style={styles.targetLabel}>STUDY TIME</Text>
+                  <Text style={styles.targetSub}>Deep focused study target</Text>
+                </View>
+                <View style={styles.counterRow}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetHours((v) => Math.max(2, v - 1));
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="remove" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <Text style={styles.counterValue}>{targetHours}h</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setTargetHours((v) => v + 1);
+                    }}
+                    style={styles.counterBtn}
+                  >
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card3D>
+
+            {/* Motivational Footer */}
+            <View style={styles.quoteBox}>
+              <Text style={styles.quoteText}>
+                ⚡ "Consistency in lectures + DPPs every single morning guarantees GATE 2027 success."
+              </Text>
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity onPress={handleSave} style={styles.saveBtn} activeOpacity={0.85}>
+              <LinearGradient
+                colors={Gradients.sunsetBlaze as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.saveBtnGradient}
+              >
+                <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.saveBtnText}>LOCK TODAY'S TARGET 🚀</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: Colors.dark.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '88%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    overflow: 'hidden',
+  },
+  headerGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIcon: {
+    fontSize: 26,
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  closeBtn: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: {
+    padding: 18,
+  },
+  sectionTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  subjectScroll: {
+    marginBottom: 16,
+  },
+  subjectChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginRight: 10,
+  },
+  subjectChipText: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  rankBadge: {
+    backgroundColor: '#000000',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  rankBadgeText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  targetCard: {
+    marginBottom: 12,
+  },
+  targetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  targetInfo: {
+    flex: 1,
+  },
+  targetLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  targetSub: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  counterBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterValue: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    minWidth: 32,
+    textAlign: 'center',
+  },
+  quoteBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#F59E0B',
+  },
+  quoteText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  saveBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 6,
+    shadowColor: '#FF512F',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  saveBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+});

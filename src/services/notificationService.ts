@@ -32,7 +32,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       name: 'GATE Preparation Reminders',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#38BDF8',
+      lightColor: '#8B5CF6',
     });
   }
 
@@ -42,7 +42,6 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 export async function scheduleAppNotifications(settings: AppSettings): Promise<void> {
   if (Platform.OS === 'web') return;
 
-  // Cancel all existing scheduled notifications
   await Notifications.cancelAllScheduledNotificationsAsync();
 
   if (!settings.notifications_enabled) {
@@ -52,60 +51,43 @@ export async function scheduleAppNotifications(settings: AppSettings): Promise<v
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
-  // Parse time helper
-  const parseTime = (timeStr: string) => {
+  const parseTime = (timeStr: string, defaultHour: number) => {
+    if (!timeStr) return { hour: defaultHour, minute: 0 };
     const [h, m] = timeStr.split(':').map(Number);
-    return { hour: isNaN(h) ? 7 : h, minute: isNaN(m) ? 0 : m };
+    return { hour: isNaN(h) ? defaultHour : h, minute: isNaN(m) ? 0 : m };
   };
 
-  // 1. Morning Study Reminder
-  const morning = parseTime(settings.morning_reminder_time || '07:00');
+  // 1. Morning Kickoff Target Reminder (07:00)
+  const morning = parseTime(settings.morning_reminder_time, 7);
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '🎯 GATE TRACK 90: Morning Focus',
-      body: `Your daily target: ${settings.daily_lecture_target} Lectures, ${settings.daily_pyq_target} PYQs. Lock in!`,
+      title: '🌅 GATE TRACK 90 • Morning Kickoff',
+      body: `Set today's focus subject and lock your ${settings.daily_lecture_target} Lectures & ${settings.daily_dpp_target} DPPs!`,
       data: { screen: 'planner' },
-      sound: true
+      sound: true,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: morning.hour,
       minute: morning.minute,
-      channelId: 'gate_track_reminders'
-    }
+      channelId: 'gate_track_reminders',
+    },
   });
 
-  // 2. Revision Due Reminder
-  const revision = parseTime(settings.revision_reminder_time || '14:00');
+  // 2. Night 9:00 PM (21:00) Check-In Reminder
+  const night = parseTime(settings.night_reminder_time, 21);
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '🧠 Spaced Repetition Due',
-      body: 'Review your scheduled R1-R5 topics today to prevent memory decay.',
-      data: { screen: 'planner' },
-      sound: true
+      title: '🌙 9:00 PM Review • Target Achieved?',
+      body: 'Check in now to log your completed lectures, DPPs, and PYQs today to keep your streak burning 🔥!',
+      data: { screen: 'index' },
+      sound: true,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: revision.hour,
-      minute: revision.minute,
-      channelId: 'gate_track_reminders'
-    }
-  });
-
-  // 3. Evening Progress Review
-  const evening = parseTime(settings.evening_reminder_time || '22:00');
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '📊 Day Audit: GATE TRACK 90',
-      body: 'Did you hit your 8-hour target? Record your study sessions and mistake logs.',
-      data: { screen: 'analytics' },
-      sound: true
+      hour: night.hour,
+      minute: night.minute,
+      channelId: 'gate_track_reminders',
     },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: evening.hour,
-      minute: evening.minute,
-      channelId: 'gate_track_reminders'
-    }
   });
 }

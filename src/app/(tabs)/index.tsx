@@ -7,107 +7,83 @@ import {
   TouchableOpacity,
   RefreshControl,
   SafeAreaView,
-  Modal,
-  TextInput,
-  Alert
+  Platform,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { useAppStore, calculatePrepDay, calculateDaysRemaining } from '../../stores/appStore';
 import {
-  useAppStore,
-  calculatePrepDay,
-  calculateDaysRemaining,
-  formatDuration
-} from '../../stores/appStore';
-import {
-  getRealProgressIndicators,
-  RealProgressIndicators,
-  getDailyTasks,
-  toggleTaskCompletion,
-  getWeakTopics,
-  getRevisionItems,
-  completeRevisionSchedule,
-  getDailyProgressRange,
-  getAllSubjects
+  getActiveSubject,
+  getSubjectsInQueue,
+  getTodayGoals,
+  getTodayProgress,
+  getWeeklyActivity,
+  getOverallStats,
+  updateSubjectProgress,
 } from '../../db/database';
+import { Subject, DailyGoal, DailyProgress, DayActivity } from '../../types';
+import { Colors, Gradients } from '../../constants/theme';
+import { Card3D } from '../../components/Card3D';
 import { CircularProgress } from '../../components/CircularProgress';
-import { MetricCard } from '../../components/MetricCard';
-import { WeeklyBarChart } from '../../components/WeeklyBarChart';
-import { Badge } from '../../components/Badge';
-import { DailyTask, WeakTopicAnalysis, RevisionSchedule, TaskCategory, Subject } from '../../types';
+import { MorningTargetModal } from '../../components/MorningTargetModal';
+import { NightReviewModal } from '../../components/NightReviewModal';
 
 export default function DashboardScreen() {
-  const { settings, dataVersion, startTimer, isTimerRunning } = useAppStore();
+  const { settings, dataVersion, triggerRefresh, startTimer } = useAppStore();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState<RealProgressIndicators | null>(null);
-  const [todayTasks, setTodayTasks] = useState<DailyTask[]>([]);
-  const [weakTopics, setWeakTopics] = useState<WeakTopicAnalysis[]>([]);
-  const [dueRevisions, setDueRevisions] = useState<
-    (RevisionSchedule & { topic_name: string; subject_name: string; subject_color: string })[]
-  >([]);
-  const [weeklyChartData, setWeeklyChartData] = useState<
-    { date: string; dayLabel: string; hours: number }[]
-  >([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
+  const [queuedSubjects, setQueuedSubjects] = useState<Subject[]>([]);
+  const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
+  const [todayProgress, setTodayProgress] = useState<DailyProgress | null>(null);
+  const [weeklyActivity, setWeeklyActivity] = useState<DayActivity[]>([]);
+  const [stats, setStats] = useState<{
+    totalLectures: number;
+    completedLectures: number;
+    lecturePct: number;
+    totalDpps: number;
+    completedDpps: number;
+    dppPct: number;
+    totalPyqs: number;
+    correctPyqs: number;
+    pyqAccuracy: number;
+    streak: number;
+    daysLeft: number;
+    dayNumber: number;
+  } | null>(null);
 
-  // Start Timer Modal State
-  const [timerModalVisible, setTimerModalVisible] = useState(false);
-  const [selectedSubjId, setSelectedSubjId] = useState('c_prog');
-  const [selectedCategory, setSelectedCategory] = useState<TaskCategory>('lecture');
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const prepDay = calculatePrepDay(settings?.prep_start_date);
-  const daysRemaining = calculateDaysRemaining(settings?.target_exam_date);
+  // Modals
+  const [morningModalVisible, setMorningModalVisible] = useState(false);
+  const [nightModalVisible, setNightModalVisible] = useState(false);
 
   const loadDashboardData = async () => {
     try {
-      const [indicators, tasks, weak, revs, subjs] = await Promise.all([
-        getRealProgressIndicators(),
-        getDailyTasks(todayStr),
-        getWeakTopics(5),
-        getRevisionItems('due_today'),
-        getAllSubjects()
+      const [activeSubj, allSubjs, goal, prog, week, allStats] = await Promise.all([
+        getActiveSubject(),
+        getSubjectsInQueue(),
+        getTodayGoals(),
+        getTodayProgress(),
+        getWeeklyActivity(7),
+        getOverallStats(),
       ]);
 
-      setStats(indicators);
-      setTodayTasks(tasks);
-      setWeakTopics(weak);
-      setDueRevisions(revs);
-      setSubjects(subjs);
-
-      // Build 7-day weekly bar chart data
-      const last7Days: { date: string; dayLabel: string; hours: number }[] = [];
-      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000);
-        const dStr = d.toISOString().slice(0, 10);
-        const dayLabel = dayNames[d.getDay()];
-        last7Days.push({ date: dStr, dayLabel, hours: 0 });
-      }
-
-      const progressRows = await getDailyProgressRange(7);
-      const progressMap = new Map(progressRows.map((r) => [r.date, r.total_study_seconds]));
-
-      const chartData = last7Days.map((item) => {
-        const seconds = progressMap.get(item.date) || 0;
-        return {
-          ...item,
-          hours: Math.round((seconds / 3600) * 10) / 10
-        };
-      });
-
-      setWeeklyChartData(chartData);
+      setActiveSubject(activeSubj);
+      setQueuedSubjects(allSubjs.filter((s) => s.id !== activeSubj?.id));
+      setTodayGoal(goal);
+      setTodayProgress(prog);
+      setWeeklyActivity(week);
+      setStats(allStats);
     } catch (e) {
-      console.error('Error loading dashboard data:', e);
+      console.error('Failed to load dashboard:', e);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       loadDashboardData();
-    }, [dataVersion, settings])
+    }, [dataVersion])
   );
 
   const onRefresh = async () => {
@@ -116,408 +92,407 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  const handleToggleTask = async (task: DailyTask) => {
-    const nextState = task.is_completed === 1 ? false : true;
-    await toggleTaskCompletion(task.id, nextState);
+  const triggerHaptic = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handleQuickAdd = async (
+    subjectId: string,
+    type: 'lecture' | 'dpp' | 'pyq'
+  ) => {
+    triggerHaptic();
+    if (type === 'lecture') {
+      await updateSubjectProgress(subjectId, { completed_lectures: 1 });
+    } else if (type === 'dpp') {
+      await updateSubjectProgress(subjectId, { completed_dpps: 1 });
+    } else {
+      await updateSubjectProgress(subjectId, { pyqs_attempted: 1, pyqs_correct: 1 });
+    }
     await loadDashboardData();
+    triggerRefresh();
   };
 
-  const handleCompleteRevision = async (revId: string) => {
-    await completeRevisionSchedule(revId, 30, 'Completed in daily revision');
-    await loadDashboardData();
-    Alert.alert('Revision Completed', 'Topic logged to revision history.');
-  };
+  // Check if current hour is past 9 PM (21:00)
+  const currentHour = new Date().getHours();
+  const isPast9PM = currentHour >= 21;
+  const isMorningTime = currentHour >= 5 && currentHour < 12;
 
-  const handleStartTimerConfirm = () => {
-    startTimer(selectedSubjId, selectedCategory, null);
-    setTimerModalVisible(false);
-  };
+  const prepDay = calculatePrepDay(settings?.prep_start_date);
+  const daysLeft = calculateDaysRemaining(settings?.target_exam_date);
 
-  const studyHoursToday = stats ? (stats.todayStudySeconds / 3600).toFixed(1) : '0.0';
-  const studyTargetHours = settings?.daily_study_hours_target || 8.0;
-  const studyHoursPct = stats
-    ? Math.min(100, Math.round((stats.todayStudySeconds / (studyTargetHours * 3600)) * 100))
-    : 0;
+  // Progress metrics calculation
+  const targetLectures = todayGoal?.target_lectures || 5;
+  const completedLectures = todayProgress?.lectures_completed || 0;
+  const lectureRatio = Math.min(1, targetLectures > 0 ? completedLectures / targetLectures : 0);
+
+  const targetDpps = todayGoal?.target_dpps || 2;
+  const completedDpps = todayProgress?.dpps_completed || 0;
+  const dppRatio = Math.min(1, targetDpps > 0 ? completedDpps / targetDpps : 0);
+
+  const targetPyqs = todayGoal?.target_pyqs || 20;
+  const completedPyqs = todayProgress?.pyqs_attempted || 0;
+  const pyqRatio = Math.min(1, targetPyqs > 0 ? completedPyqs / targetPyqs : 0);
+
+  const studySeconds = todayProgress?.total_study_seconds || 0;
+  const studyHours = Math.round((studySeconds / 3600) * 10) / 10;
+  const targetHours = todayGoal ? Math.round(todayGoal.target_study_minutes / 60) : 8;
+
+  const totalScore = Math.round(
+    ((lectureRatio + dppRatio + pyqRatio + Math.min(1, studyHours / targetHours)) / 4) * 100
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38BDF8" />}
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B5CF6" />}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.badgeRow}>
-              <Badge label="Parakram GATE 2027 Batch B" variant="primary" size="sm" />
-            </View>
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <View>
             <Text style={styles.appTitle}>GATE TRACK 90</Text>
-            <Text style={styles.dateText}>
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric'
-              })}
+            <Text style={styles.subtitle}>
+              Day {prepDay.day} of 90 • {daysLeft} Days to GATE 2027
             </Text>
           </View>
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.settingsIconBtn}
-              onPress={() => router.push('/settings')}
+          <View style={styles.topRightRow}>
+            {/* Streak Badge */}
+            <LinearGradient
+              colors={Gradients.sunsetBlaze as any}
+              style={styles.streakBadge}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             >
-              <Ionicons name="settings-outline" size={20} color="#F8FAFC" />
+              <Ionicons name="flame" size={16} color="#FFFFFF" />
+              <Text style={styles.streakText}>{stats?.streak ?? 0}D</Text>
+            </LinearGradient>
+            {/* Settings button */}
+            <TouchableOpacity onPress={() => router.push('/settings')} style={styles.gearBtn}>
+              <Ionicons name="settings-outline" size={20} color="#94A3B8" />
             </TouchableOpacity>
-
-            <View style={styles.countdownBadge}>
-              <Text style={styles.countdownDay}>Day {prepDay.day}/90</Text>
-              <Text style={styles.countdownExam}>{daysRemaining}d to GATE</Text>
-            </View>
           </View>
         </View>
 
-        {/* Floating Quick Action Timer Bar */}
-        {!isTimerRunning && (
+        {/* 2 Primary Action Banners: Morning Target & Night 9 PM Review */}
+        <View style={styles.actionPillRow}>
+          {/* Morning Kickoff Pill */}
           <TouchableOpacity
-            style={styles.timerTriggerBar}
+            onPress={() => setMorningModalVisible(true)}
+            style={styles.actionPill}
             activeOpacity={0.8}
-            onPress={() => setTimerModalVisible(true)}
           >
-            <View style={styles.timerTriggerLeft}>
-              <View style={styles.timerPlayCircle}>
-                <Ionicons name="play" size={14} color="#0A0C10" />
-              </View>
+            <LinearGradient
+              colors={
+                todayGoal?.is_morning_set === 1
+                  ? (['#065F46', '#047857'] as any)
+                  : (['#B45309', '#D97706'] as any)
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.pillGradient}
+            >
+              <Text style={styles.pillIcon}>{todayGoal?.is_morning_set === 1 ? '✅' : '🌅'}</Text>
               <View>
-                <Text style={styles.timerTriggerTitle}>Start Study Session</Text>
-                <Text style={styles.timerTriggerSub}>Track focused PW lectures, DPP & drills</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#64748B" />
-          </TouchableOpacity>
-        )}
-
-        {/* Primary Today's Target Highlight Card */}
-        <View style={styles.targetHighlightCard}>
-          <View style={styles.targetLeftCol}>
-            <Text style={styles.targetCardLabel}>TODAY'S CORE TARGET</Text>
-            <Text style={styles.targetCardTitle}>
-              5 Lectures • 2 DPP • 20 PYQ
-            </Text>
-            <Text style={styles.targetCardSub}>
-              {studyHoursToday}h logged of {studyTargetHours}h target ({studyHoursPct}%)
-            </Text>
-
-            <View style={styles.streakRow}>
-              <Ionicons name="flame" size={16} color="#F59E0B" />
-              <Text style={styles.streakText}>
-                {stats?.currentStreak || 0} Day Authentic Streak
-              </Text>
-            </View>
-          </View>
-
-          <CircularProgress
-            size={88}
-            strokeWidth={9}
-            percentage={studyHoursPct}
-            color="#38BDF8"
-            trackColor="#1F2636"
-            centerText={`${studyHoursToday}h`}
-            centerSubtext="STUDIED"
-          />
-        </View>
-
-        {/* Section: 5 Separate Real Progress Indicators */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Syllabus & Preparation Health</Text>
-          <Text style={styles.sectionNote}>Separated real counts</Text>
-        </View>
-
-        <View style={styles.metricsGrid}>
-          {/* 1. PW Lectures */}
-          <MetricCard
-            title="PW Lectures"
-            value={`${stats?.completedLectures || 0} / ${stats?.totalLectures || 487}`}
-            subtext={`${stats?.confirmedLectures || 117} Confirmed • ${stats?.estimatedLectures || 370} Estimated`}
-            iconName="videocam-outline"
-            iconColor="#38BDF8"
-            progress={stats?.lectureCompletionPct || 0}
-            progressColor="#38BDF8"
-            style={{ width: '48%' }}
-          />
-
-          {/* 2. DPP Completion */}
-          <MetricCard
-            title="PW DPP Sheets"
-            value={`${stats?.completedDpps || 0} / ${stats?.totalConfirmedDpps || 41}`}
-            subtext={
-              stats && stats.totalConfirmedDpps > 0
-                ? `${stats.dppCompletionPct}% of confirmed 41 DPPs`
-                : 'Confirmed DPPs only'
-            }
-            iconName="list-outline"
-            iconColor="#10B981"
-            progress={stats?.dppCompletionPct || 0}
-            progressColor="#10B981"
-            style={{ width: '48%' }}
-          />
-
-          {/* 3. GATE PYQ Practice */}
-          <MetricCard
-            title="GATE PYQ Practice"
-            value={`${stats?.todayPyqsAttempted || 0} / ${settings?.daily_pyq_target || 20}`}
-            subtext={
-              stats && stats.overallAccuracyPct !== null
-                ? `${stats.overallAccuracyPct}% Accuracy (${stats.totalPyqsCorrect}/${stats.totalPyqsAttempted})`
-                : 'Not Started (0 attempts)'
-            }
-            iconName="document-text-outline"
-            iconColor="#F59E0B"
-            progress={
-              stats && settings
-                ? Math.min(100, Math.round((stats.todayPyqsAttempted / settings.daily_pyq_target) * 100))
-                : 0
-            }
-            progressColor="#F59E0B"
-            style={{ width: '48%' }}
-          />
-
-          {/* 4. Revision Adherence */}
-          <MetricCard
-            title="Spaced Revision"
-            value={`${stats?.todayRevisionsCompleted || 0} / ${stats?.todayRevisionsDue || 0}`}
-            subtext={
-              stats && stats.todayRevisionsDue > 0
-                ? `${stats.todayRevisionsDue - stats.todayRevisionsCompleted} pending today`
-                : 'All caught up'
-            }
-            iconName="refresh-outline"
-            iconColor="#818CF8"
-            progress={
-              stats && stats.todayRevisionsDue > 0
-                ? Math.round((stats.todayRevisionsCompleted / stats.todayRevisionsDue) * 100)
-                : 100
-            }
-            progressColor="#818CF8"
-            style={{ width: '48%' }}
-          />
-        </View>
-
-        {/* Weekly Study Hours Bar Chart */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>7-Day Study Hours Distribution</Text>
-          <Text style={styles.sectionNote}>Daily 8h target line</Text>
-        </View>
-        <WeeklyBarChart data={weeklyChartData} targetHours={studyTargetHours} />
-
-        {/* Section: Today's Tasks & Execution */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Today's Execution Checklist</Text>
-          <TouchableOpacity onPress={() => router.push('/planner')}>
-            <Text style={styles.seeAllText}>Open Planner →</Text>
-          </TouchableOpacity>
-        </View>
-
-        {todayTasks.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="checkmark-done-circle-outline" size={32} color="#10B981" />
-            <Text style={styles.emptyTitle}>No Pending Tasks for Today</Text>
-            <Text style={styles.emptySub}>
-              Tap below or visit Planner to generate your 5-lecture + 2-DPP schedule.
-            </Text>
-            <TouchableOpacity
-              style={styles.genBtn}
-              onPress={() => router.push('/planner')}
-            >
-              <Text style={styles.genBtnText}>Generate Today's Plan</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          todayTasks.slice(0, 6).map((task) => (
-            <TouchableOpacity
-              key={task.id}
-              style={[styles.taskItem, task.is_completed === 1 && styles.taskItemDone]}
-              activeOpacity={0.7}
-              onPress={() => handleToggleTask(task)}
-            >
-              <View style={styles.taskCheckbox}>
-                <Ionicons
-                  name={task.is_completed === 1 ? 'checkbox' : 'square-outline'}
-                  size={20}
-                  color={task.is_completed === 1 ? '#10B981' : '#64748B'}
-                />
-              </View>
-
-              <View style={styles.taskInfo}>
-                <Text
-                  style={[
-                    styles.taskTitle,
-                    task.is_completed === 1 && styles.taskTitleDone
-                  ]}
-                  numberOfLines={1}
-                >
-                  {task.title}
+                <Text style={styles.pillTitle}>
+                  {todayGoal?.is_morning_set === 1 ? 'Target Locked' : 'Morning Target'}
                 </Text>
-                <View style={styles.taskMetaRow}>
-                  <Badge
-                    label={task.category.toUpperCase()}
-                    variant={
-                      task.category === 'lecture'
-                        ? 'primary'
-                        : task.category === 'dpp'
-                        ? 'success'
-                        : task.category === 'pyq_practice'
-                        ? 'warning'
-                        : 'neutral'
-                    }
-                    size="sm"
-                  />
-                  {task.subject_name && (
-                    <Text style={styles.taskSubjectText}>{task.subject_name}</Text>
-                  )}
-                </View>
+                <Text style={styles.pillSub}>
+                  {todayGoal?.target_lectures ?? 5}L • {todayGoal?.target_dpps ?? 2}D • {todayGoal?.target_pyqs ?? 20}P
+                </Text>
               </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
-              {task.is_completed === 1 ? (
-                <Badge label="DONE" variant="success" size="sm" />
-              ) : (
-                <Ionicons name="chevron-forward" size={16} color="#64748B" />
-              )}
-            </TouchableOpacity>
-          ))
-        )}
+          {/* Night 9 PM Review Pill */}
+          <TouchableOpacity
+            onPress={() => setNightModalVisible(true)}
+            style={styles.actionPill}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={
+                todayProgress?.night_review_done === 1
+                  ? (['#4C1D95', '#6D28D9'] as any)
+                  : isPast9PM
+                  ? (['#BE123C', '#E11D48'] as any)
+                  : (['#1E293B', '#334155'] as any)
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.pillGradient}
+            >
+              <Text style={styles.pillIcon}>
+                {todayProgress?.night_review_done === 1 ? '🎉' : '🌙'}
+              </Text>
+              <View>
+                <Text style={styles.pillTitle}>
+                  {todayProgress?.night_review_done === 1 ? '9 PM Done' : '9 PM Review'}
+                </Text>
+                <Text style={styles.pillSub}>
+                  {todayProgress?.night_review_done === 1
+                    ? `${todayProgress.target_achieved_pct}% Achieved`
+                    : isPast9PM
+                    ? 'Check-In Due!'
+                    : 'Scheduled 9 PM'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
-        {/* Section: Spaced Revisions Due Today */}
-        {dueRevisions.length > 0 && (
-          <>
+        {/* FEATURED: Real 3D Active Subject Card */}
+        {activeSubject && (
+          <View style={styles.sectionWrap}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Revisions Due Today (R1–R5)</Text>
-              <Badge label={`${dueRevisions.length} DUE`} variant="warning" size="sm" />
-            </View>
-
-            {dueRevisions.map((rev) => (
-              <View key={rev.id} style={styles.revCard}>
-                <View style={styles.revCardLeft}>
-                  <View style={styles.revStageBox}>
-                    <Text style={styles.revStageText}>{rev.interval_stage}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.revTopicTitle}>{rev.topic_name}</Text>
-                    <Text style={styles.revSubject}>{rev.subject_name}</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.revDoneBtn}
-                  onPress={() => handleCompleteRevision(rev.id)}
-                >
-                  <Text style={styles.revDoneBtnText}>Revised</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </>
-        )}
-
-        {/* Section: Weak Topics Remediation */}
-        {weakTopics.length > 0 && (
-          <>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Identified Weak Topics</Text>
-              <Text style={styles.sectionNote}>&lt;50% Critical</Text>
-            </View>
-
-            {weakTopics.map((item) => (
-              <View key={item.topic_id} style={styles.weakItem}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.weakTopicName}>{item.topic_name}</Text>
-                  <Text style={styles.weakSubjectName}>{item.subject_name}</Text>
-                </View>
-                <View style={styles.weakRight}>
-                  <Badge
-                    label={item.status.toUpperCase()}
-                    variant={item.status === 'Critical' ? 'danger' : 'warning'}
-                    size="sm"
-                  />
-                  <Text style={styles.weakAccuracyText}>{item.accuracy}% Accuracy</Text>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
-
-        <View style={{ height: 30 }} />
-      </ScrollView>
-
-      {/* Start Study Timer Modal */}
-      <Modal
-        visible={timerModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setTimerModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Start Focused Study Timer</Text>
-              <TouchableOpacity onPress={() => setTimerModalVisible(false)}>
-                <Ionicons name="close" size={22} color="#94A3B8" />
+              <Text style={styles.sectionHeader}>★ ACTIVE SUBJECT IN QUEUE</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/roadmap')}>
+                <Text style={styles.viewQueueLink}>Manage Queue →</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalLabel}>Select Subject</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsRow}>
-              {subjects.map((s) => (
+            <Card3D
+              gradient={[activeSubject.gradient_start, activeSubject.gradient_end] as any}
+              style={styles.heroCard}
+            >
+              <View style={styles.heroTop}>
+                <View style={styles.heroBadgePill}>
+                  <Text style={styles.heroBadgeText}>TOP PRIORITY (#1)</Text>
+                </View>
                 <TouchableOpacity
-                  key={s.id}
-                  style={[styles.pill, selectedSubjId === s.id && styles.pillActive]}
-                  onPress={() => setSelectedSubjId(s.id)}
+                  onPress={() => startTimer('cs_active', 'study')}
+                  style={styles.timerChip}
                 >
-                  <Text style={[styles.pillText, selectedSubjId === s.id && styles.pillTextActive]}>
-                    {s.code}
-                  </Text>
+                  <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
+                  <Text style={styles.timerChipText}>Timer</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              </View>
 
-            <Text style={styles.modalLabel}>Select Task Category</Text>
-            <View style={styles.catGrid}>
-              {[
-                { cat: 'lecture', label: 'PW Lecture', icon: 'videocam-outline' },
-                { cat: 'dpp', label: 'PW DPP Drill', icon: 'list-outline' },
-                { cat: 'pyq_practice', label: 'GATE PYQ', icon: 'document-text-outline' },
-                { cat: 'revision', label: 'Revision', icon: 'refresh-outline' }
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.cat}
-                  style={[
-                    styles.catBox,
-                    selectedCategory === item.cat && styles.catBoxActive
-                  ]}
-                  onPress={() => setSelectedCategory(item.cat as TaskCategory)}
-                >
-                  <Ionicons
-                    name={item.icon as any}
-                    size={18}
-                    color={selectedCategory === item.cat ? '#38BDF8' : '#94A3B8'}
-                  />
-                  <Text
-                    style={[
-                      styles.catBoxText,
-                      selectedCategory === item.cat && styles.catBoxTextActive
-                    ]}
-                  >
-                    {item.label}
+              <Text style={styles.heroSubjectName}>{activeSubject.name}</Text>
+              <Text style={styles.heroSubjectCode}>{activeSubject.code}</Text>
+
+              {/* 3 Metric Rows with 1-Tap Quick Increment Buttons */}
+              <View style={styles.heroMetricsGrid}>
+                {/* Lectures */}
+                <View style={styles.heroMetricCol}>
+                  <Text style={styles.heroMetricLabel}>LECTURES</Text>
+                  <Text style={styles.heroMetricVal}>
+                    {activeSubject.completed_lectures}
+                    <Text style={styles.heroMetricSub}>/{activeSubject.total_lectures}</Text>
                   </Text>
-                </TouchableOpacity>
-              ))}
+                  <TouchableOpacity
+                    onPress={() => handleQuickAdd(activeSubject.id, 'lecture')}
+                    style={styles.heroAddBtn}
+                  >
+                    <Ionicons name="add" size={14} color="#FFFFFF" />
+                    <Text style={styles.heroAddText}>Seen +1</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* DPP */}
+                <View style={styles.heroMetricCol}>
+                  <Text style={styles.heroMetricLabel}>DPP SOLVED</Text>
+                  <Text style={styles.heroMetricVal}>
+                    {activeSubject.completed_dpps}
+                    <Text style={styles.heroMetricSub}>/{activeSubject.total_dpps}</Text>
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleQuickAdd(activeSubject.id, 'dpp')}
+                    style={[styles.heroAddBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)' }]}
+                  >
+                    <Ionicons name="add" size={14} color="#FFFFFF" />
+                    <Text style={styles.heroAddText}>DPP +1</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* PYQ */}
+                <View style={styles.heroMetricCol}>
+                  <Text style={styles.heroMetricLabel}>GATE PYQS</Text>
+                  <Text style={styles.heroMetricVal}>
+                    {activeSubject.pyqs_attempted}
+                    <Text style={styles.heroMetricSub}> Solved</Text>
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleQuickAdd(activeSubject.id, 'pyq')}
+                    style={[styles.heroAddBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)' }]}
+                  >
+                    <Ionicons name="add" size={14} color="#FFFFFF" />
+                    <Text style={styles.heroAddText}>PYQ +1</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card3D>
+          </View>
+        )}
+
+        {/* Today's Target vs Achieved Progress Ring Card */}
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionHeader}>TODAY'S TARGET VS ACHIEVED</Text>
+          <Card3D gradient={Gradients.cardGlassDark as any} style={styles.targetStatusCard}>
+            <View style={styles.targetStatusRow}>
+              {/* Circular Progress Ring */}
+              <View style={styles.ringCol}>
+                <CircularProgress
+                  size={100}
+                  strokeWidth={10}
+                  percentage={totalScore}
+                  color="#8B5CF6"
+                  centerText={`${totalScore}%`}
+                  centerSubtext="Target"
+                />
+              </View>
+
+              {/* Progress Breakdown */}
+              <View style={styles.statsBreakdown}>
+                <View style={styles.statRow}>
+                  <View style={[styles.statDot, { backgroundColor: '#8B5CF6' }]} />
+                  <Text style={styles.statLabel}>PW Lectures:</Text>
+                  <Text style={styles.statNumbers}>
+                    {completedLectures}/{targetLectures}
+                  </Text>
+                </View>
+
+                <View style={styles.statRow}>
+                  <View style={[styles.statDot, { backgroundColor: '#06B6D4' }]} />
+                  <Text style={styles.statLabel}>DPP Sheets:</Text>
+                  <Text style={styles.statNumbers}>
+                    {completedDpps}/{targetDpps}
+                  </Text>
+                </View>
+
+                <View style={styles.statRow}>
+                  <View style={[styles.statDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={styles.statLabel}>GATE PYQs:</Text>
+                  <Text style={styles.statNumbers}>
+                    {completedPyqs}/{targetPyqs}
+                  </Text>
+                </View>
+
+                <View style={styles.statRow}>
+                  <View style={[styles.statDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={styles.statLabel}>Study Hours:</Text>
+                  <Text style={styles.statNumbers}>
+                    {studyHours}h/{targetHours}h
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Card3D>
+        </View>
+
+        {/* Queued Next Subjects Preview */}
+        {queuedSubjects.length > 0 && (
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>NEXT IN STUDY QUEUE</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/roadmap')}>
+                <Text style={styles.viewQueueLink}>View All ({queuedSubjects.length}) →</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.startModalBtn} onPress={handleStartTimerConfirm}>
-              <Ionicons name="play" size={18} color="#0A0C10" />
-              <Text style={styles.startModalBtnText}>Start Tracking Time</Text>
-            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.queuePreviewScroll}>
+              {queuedSubjects.slice(0, 4).map((subj) => {
+                const pct =
+                  subj.total_lectures > 0
+                    ? Math.round((subj.completed_lectures / subj.total_lectures) * 100)
+                    : 0;
+
+                return (
+                  <TouchableOpacity
+                    key={subj.id}
+                    onPress={() => router.push('/(tabs)/roadmap')}
+                    activeOpacity={0.8}
+                    style={styles.queueMiniCard}
+                  >
+                    <View style={styles.miniCardTop}>
+                      <Text style={styles.miniRank}>#{subj.queue_order}</Text>
+                      <Ionicons name={subj.icon as any} size={16} color={subj.color} />
+                    </View>
+                    <Text style={styles.miniName} numberOfLines={1}>
+                      {subj.name}
+                    </Text>
+                    <Text style={styles.miniStats}>
+                      {subj.completed_lectures}/{subj.total_lectures} Lec ({pct}%)
+                    </Text>
+                    <View style={styles.miniTrack}>
+                      <View style={[styles.miniFill, { width: `${pct}%`, backgroundColor: subj.color }]} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
+        )}
+
+        {/* 7-Day Colorful Weekly Bar Chart */}
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionHeader}>7-DAY PREPARATION CONSISTENCY</Text>
+          <Card3D gradient={Gradients.cardGlassDark as any} style={styles.chartCard}>
+            <View style={styles.barsContainer}>
+              {weeklyActivity.map((day, idx) => {
+                const maxHours = 10;
+                const barHeight = Math.min(100, (day.studyHours / maxHours) * 100);
+                const isTargetMet = day.studyHours >= day.targetHours;
+
+                return (
+                  <View key={day.date} style={styles.barCol}>
+                    <Text style={styles.barTopHours}>{day.studyHours > 0 ? `${day.studyHours}h` : ''}</Text>
+                    <View style={styles.barTrack}>
+                      <LinearGradient
+                        colors={
+                          isTargetMet
+                            ? (['#10B981', '#059669'] as any)
+                            : day.studyHours > 0
+                            ? (['#6366F1', '#8B5CF6'] as any)
+                            : (['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)'] as any)
+                        }
+                        style={[styles.barFill, { height: `${Math.max(6, barHeight)}%` }]}
+                      />
+                    </View>
+                    <Text style={styles.barDayLabel}>{day.dayLabel}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                <Text style={styles.legendText}>8h Target Met</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#6366F1' }]} />
+                <Text style={styles.legendText}>In Progress</Text>
+              </View>
+            </View>
+          </Card3D>
         </View>
-      </Modal>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* Morning Target Planner Modal */}
+      <MorningTargetModal
+        visible={morningModalVisible}
+        onClose={() => setMorningModalVisible(false)}
+        onSaved={async () => {
+          await loadDashboardData();
+          triggerRefresh();
+        }}
+        currentGoal={todayGoal}
+      />
+
+      {/* Night 9 PM Target Achieved Review Modal */}
+      <NightReviewModal
+        visible={nightModalVisible}
+        onClose={() => setNightModalVisible(false)}
+        onSaved={async () => {
+          await loadDashboardData();
+          triggerRefresh();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -525,430 +500,343 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0A0C10',
+    backgroundColor: Colors.dark.bg,
   },
   container: {
-    padding: 16,
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
     paddingTop: 8,
   },
-  header: {
+  topHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  badgeRow: {
-    marginBottom: 4,
+    paddingVertical: 12,
   },
   appTitle: {
-    fontSize: 24,
+    color: '#FFFFFF',
+    fontSize: 22,
     fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
-  dateText: {
-    fontSize: 13,
-    fontWeight: '500',
+  subtitle: {
     color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
     marginTop: 2,
   },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  settingsIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  countdownBadge: {
-    backgroundColor: '#131720',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  countdownDay: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#38BDF8',
-  },
-  countdownExam: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#94A3B8',
-  },
-  timerTriggerBar: {
-    backgroundColor: '#131720',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    borderRadius: 10,
-    padding: 12,
+  topRightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
+    gap: 8,
   },
-  timerTriggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  timerPlayCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#38BDF8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timerTriggerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  timerTriggerSub: {
-    fontSize: 11,
-    fontWeight: '400',
-    color: '#94A3B8',
-  },
-  targetHighlightCard: {
-    backgroundColor: '#131720',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  targetLeftCol: {
-    flex: 1,
-    marginRight: 12,
-  },
-  targetCardLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#38BDF8',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  targetCardTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: -0.3,
-  },
-  targetCardSub: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  streakRow: {
+  streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   streakText: {
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  gearBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionPillRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginVertical: 12,
+  },
+  actionPill: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  pillGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  pillIcon: {
+    fontSize: 20,
+  },
+  pillTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pillSub: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 10,
     fontWeight: '600',
-    color: '#F59E0B',
+    marginTop: 2,
+  },
+  sectionWrap: {
+    marginTop: 14,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 18,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    letterSpacing: -0.2,
-  },
-  sectionNote: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  seeAllText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#38BDF8',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  taskItem: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 8,
   },
-  taskItemDone: {
-    opacity: 0.6,
-    borderColor: '#1E2536',
+  sectionHeader: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
-  taskCheckbox: {
-    marginRight: 10,
+  viewQueueLink: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
   },
-  taskInfo: {
+  heroCard: {
+    borderRadius: 22,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  heroBadgePill: {
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  heroBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  timerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  timerChipText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heroSubjectName: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  heroSubjectCode: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 14,
+  },
+  heroMetricsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 16,
+    padding: 10,
+  },
+  heroMetricCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  heroMetricLabel: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  heroMetricVal: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    marginVertical: 4,
+  },
+  heroMetricSub: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontWeight: '500',
+  },
+  heroAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  heroAddText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  targetStatusCard: {
+    borderRadius: 20,
+  },
+  targetStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ringCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: 16,
+  },
+  statsBreakdown: {
+    flex: 1,
+    gap: 8,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
     flex: 1,
   },
-  taskTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+  statNumbers: {
     color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  taskTitleDone: {
-    textDecorationLine: 'line-through',
+  queuePreviewScroll: {
+    marginHorizontal: -4,
+  },
+  queueMiniCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 12,
+    width: 140,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  miniCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  miniRank: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  miniName: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  miniStats: {
     color: '#94A3B8',
+    fontSize: 10,
+    marginTop: 4,
   },
-  taskMetaRow: {
+  miniTrack: {
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  miniFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  chartCard: {
+    borderRadius: 20,
+  },
+  barsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 120,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  barCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  barTopHours: {
+    color: '#94A3B8',
+    fontSize: 9,
+    fontWeight: '600',
+    height: 12,
+    marginBottom: 4,
+  },
+  barTrack: {
+    width: 14,
+    height: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 7,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  barFill: {
+    width: '100%',
+    borderRadius: 7,
+  },
+  barDayLabel: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  chartLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 4,
   },
-  taskSubjectText: {
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: '#94A3B8',
     fontSize: 11,
-    color: '#64748B',
-  },
-  emptyCard: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginTop: 8,
-  },
-  emptySub: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 14,
-  },
-  genBtn: {
-    backgroundColor: '#38BDF8',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  genBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0A0C10',
-  },
-  revCard: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  revCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 10,
-  },
-  revStageBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  revStageText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#F59E0B',
-  },
-  revTopicTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#F8FAFC',
-  },
-  revSubject: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 1,
-  },
-  revDoneBtn: {
-    backgroundColor: '#10B981',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  revDoneBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  weakItem: {
-    backgroundColor: '#131720',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  weakTopicName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#F8FAFC',
-  },
-  weakSubjectName: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  weakRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  weakAccuracyText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#F43F5E',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#131720',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-    borderTopWidth: 1,
-    borderColor: '#232A3B',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  modalLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginTop: 10,
-    marginBottom: 8,
-  },
-  pillsRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-    marginRight: 8,
-  },
-  pillActive: {
-    backgroundColor: '#38BDF8',
-    borderColor: '#38BDF8',
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  pillTextActive: {
-    color: '#0A0C10',
-  },
-  catGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  catBox: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#171C28',
-    borderWidth: 1,
-    borderColor: '#232A3B',
-  },
-  catBoxActive: {
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-  },
-  catBoxText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  catBoxTextActive: {
-    color: '#38BDF8',
-  },
-  startModalBtn: {
-    backgroundColor: '#38BDF8',
-    borderRadius: 10,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  startModalBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0A0C10',
+    fontWeight: '500',
   },
 });
-

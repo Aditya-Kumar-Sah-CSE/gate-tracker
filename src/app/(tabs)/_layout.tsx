@@ -39,9 +39,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="roadmap"
         options={{
-          title: 'Roadmap',
+          title: 'Queue',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'map' : 'map-outline'} size={size - 2} color={color as string} />
+            <Ionicons name={focused ? 'layers' : 'layers-outline'} size={size - 2} color={color as string} />
           ),
         }}
       />
