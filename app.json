@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "gate-track-90",
+    "name": "GATE TRACK 90",
     "slug": "gate-track-90",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,13 +11,16 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.gatetrack90.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0A0C10",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["NOTIFICATIONS", "VIBRATE"]
     },
     "web": {
       "output": "server",
@@ -28,9 +31,18 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0A0C10",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      "expo-sqlite",
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#38BDF8"
         }
       ]
     ],
