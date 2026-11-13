@@ -32,21 +32,6 @@ export default function OnboardingScreen() {
   const [weakSubj1, setWeakSubj1] = useState('CS-COA');
   const [weakSubj2, setWeakSubj2] = useState('CS-CD');
 
-  const subjectsList = [
-    { code: 'CS-GA', name: 'General Aptitude (18 Lec / 19 DPP)' },
-    { code: 'CS-TOC', name: 'Theory of Computation (29 Lec / 5 DPP)' },
-    { code: 'CS-CP', name: 'C Programming (22 Lec / 11 DPP)' },
-    { code: 'CS-DM', name: 'Discrete Mathematics (48 Lec / 6 DPP)' },
-    { code: 'CS-DSA', name: 'Data Structures & Algorithms (Est. 30)' },
-    { code: 'CS-DBMS', name: 'DBMS (Est. 30)' },
-    { code: 'CS-OS', name: 'Operating Systems (Est. 30)' },
-    { code: 'CS-CN', name: 'Computer Networks (Est. 30)' },
-    { code: 'CS-DL', name: 'Digital Logic (Est. 30)' },
-    { code: 'CS-COA', name: 'COA (Est. 30)' },
-    { code: 'CS-CD', name: 'Compiler Design (Est. 30)' },
-    { code: 'CS-EM', name: 'Engineering Mathematics (Est. 30)' }
-  ];
-
   const handleFinish = async () => {
     const hoursNum = parseFloat(dailyHours) || 8.0;
     const lecNum = parseInt(dailyLectures, 10) || 5;

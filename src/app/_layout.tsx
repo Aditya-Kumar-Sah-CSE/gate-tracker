@@ -32,7 +32,7 @@ export default function RootLayout() {
     }
 
     prepare();
-  }, []);
+  }, [loadSettings]);
 
   if (!isReady) {
     return (

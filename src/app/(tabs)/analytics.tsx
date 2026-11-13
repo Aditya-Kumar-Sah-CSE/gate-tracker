@@ -40,7 +40,7 @@ export default function AnalyticsScreen() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [weeklyActivity, setWeeklyActivity] = useState<DayActivity[]>([]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [allStats, subjs, week] = await Promise.all([
         getOverallStats(),
@@ -53,12 +53,14 @@ export default function AnalyticsScreen() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [dataVersion])
+      if (dataVersion >= 0) {
+        loadData();
+      }
+    }, [loadData, dataVersion])
   );
 
   return (

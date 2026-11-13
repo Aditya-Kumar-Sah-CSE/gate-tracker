@@ -6,8 +6,6 @@ import {
   DailyGoal,
   DailyProgress,
   PyqAttempt,
-  MistakeLog,
-  StudySession,
   DayActivity,
   MistakeCategory,
   DifficultyLevel,
@@ -405,6 +403,13 @@ export async function saveNightReview(review: {
   const targetAchievedPct = Math.min(100, Math.round((lPct + dPct + pPct) / 3));
 
   await db.withTransactionAsync(async () => {
+    // Check current progress to accurately compute deltas and avoid double-counting
+    const currentProg = await getTodayProgress();
+    const deltaLectures = Math.max(0, review.lectures_completed - currentProg.lectures_completed);
+    const deltaDpps = Math.max(0, review.dpps_completed - currentProg.dpps_completed);
+    const deltaPyqs = Math.max(0, review.pyqs_attempted - currentProg.pyqs_attempted);
+    const deltaCorrect = Math.max(0, review.pyqs_correct - currentProg.pyqs_correct);
+
     await db.runAsync(
       `INSERT INTO daily_progress (
         id, date, total_study_seconds, lectures_completed, dpps_completed,
@@ -437,14 +442,27 @@ export async function saveNightReview(review: {
       ]
     );
 
-    // If subject was designated, increment subject counters
-    if (review.subject_id) {
-      await updateSubjectProgress(review.subject_id, {
-        completed_lectures: review.lectures_completed,
-        completed_dpps: review.dpps_completed,
-        pyqs_attempted: review.pyqs_attempted,
-        pyqs_correct: review.pyqs_correct,
-      });
+    // If subject was designated, increment subject counters ONLY by the delta not yet counted
+    if (review.subject_id && (deltaLectures > 0 || deltaDpps > 0 || deltaPyqs > 0 || deltaCorrect > 0)) {
+      const subj = await db.getFirstAsync<Subject>('SELECT * FROM subjects WHERE id = ?;', [review.subject_id]);
+      if (subj) {
+        const newLectures = Math.max(0, subj.completed_lectures + deltaLectures);
+        const newDpps = Math.max(0, subj.completed_dpps + deltaDpps);
+        const newPyqsAttempted = Math.max(0, subj.pyqs_attempted + deltaPyqs);
+        const newPyqsCorrect = Math.max(0, subj.pyqs_correct + deltaCorrect);
+        const status = newLectures >= subj.total_lectures && subj.total_lectures > 0 ? 'completed' : subj.status;
+
+        await db.runAsync(
+          `UPDATE subjects SET
+            completed_lectures = ?,
+            completed_dpps = ?,
+            pyqs_attempted = ?,
+            pyqs_correct = ?,
+            status = ?
+          WHERE id = ?;`,
+          [newLectures, newDpps, newPyqsAttempted, newPyqsCorrect, status, review.subject_id]
+        );
+      }
     }
   });
 
@@ -654,7 +672,6 @@ export async function getWeeklyActivity(days = 7): Promise<DayActivity[]> {
 }
 
 export async function getOverallStats() {
-  const db = await getDatabase();
   const subjects = await getSubjectsInQueue();
 
   let totalLectures = 0;

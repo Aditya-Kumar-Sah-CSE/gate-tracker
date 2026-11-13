@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../stores/appStore';
 import {
@@ -43,7 +42,7 @@ export default function PyqScreen() {
   const [mistakeCat, setMistakeCat] = useState<MistakeCategory>('Conceptual mistake');
   const [notes, setNotes] = useState('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [subjList, attemptList] = await Promise.all([
         getSubjectsInQueue(),
@@ -57,12 +56,14 @@ export default function PyqScreen() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [selectedSubjId]);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [dataVersion])
+      if (dataVersion >= 0) {
+        loadData();
+      }
+    }, [loadData, dataVersion])
   );
 
   const triggerHaptic = () => {
@@ -211,7 +212,7 @@ export default function PyqScreen() {
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyIcon}>📝</Text>
                   <Text style={styles.emptyText}>No PYQs logged yet today</Text>
-                  <Text style={styles.emptySub}>Tap 'Log PYQ' to record your first question!</Text>
+                  <Text style={styles.emptySub}>{"Tap 'Log PYQ' to record your first question!"}</Text>
                 </View>
               ) : (
                 attempts.map((att) => {
@@ -301,6 +302,53 @@ export default function PyqScreen() {
                       keyboardType="numeric"
                     />
                   </View>
+                </View>
+
+                {/* Marks & Difficulty */}
+                <View style={styles.twoCol}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Marks</Text>
+                    <View style={styles.marksRow}>
+                      <TouchableOpacity
+                        onPress={() => setMarks(1)}
+                        style={[styles.smallPill, marks === 1 && styles.smallPillActive]}
+                      >
+                        <Text style={[styles.smallPillText, marks === 1 && styles.smallPillTextActive]}>1M</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setMarks(2)}
+                        style={[styles.smallPill, marks === 2 && styles.smallPillActive]}
+                      >
+                        <Text style={[styles.smallPillText, marks === 2 && styles.smallPillTextActive]}>2M</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Difficulty</Text>
+                    <View style={styles.marksRow}>
+                      {(['Easy', 'Medium', 'Hard'] as DifficultyLevel[]).map((diff) => (
+                        <TouchableOpacity
+                          key={diff}
+                          onPress={() => setDifficulty(diff)}
+                          style={[styles.smallPill, difficulty === diff && styles.smallPillActive]}
+                        >
+                          <Text style={[styles.smallPillText, difficulty === diff && styles.smallPillTextActive]}>
+                            {diff}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={styles.fieldLabel}>Time Taken (Minutes)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={timeMins}
+                    onChangeText={setTimeMins}
+                    keyboardType="numeric"
+                  />
                 </View>
 
                 {/* Result: Correct or Incorrect */}
@@ -701,6 +749,32 @@ const styles = StyleSheet.create({
   catText: {
     color: '#94A3B8',
     fontSize: 12,
+  },
+  marksRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  smallPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  smallPillActive: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  smallPillText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  smallPillTextActive: {
+    color: '#FFFFFF',
   },
   submitBtn: {
     backgroundColor: '#10B981',

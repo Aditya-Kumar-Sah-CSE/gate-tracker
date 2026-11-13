@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -58,7 +58,7 @@ export default function DashboardScreen() {
   const [morningModalVisible, setMorningModalVisible] = useState(false);
   const [nightModalVisible, setNightModalVisible] = useState(false);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       const [activeSubj, allSubjs, goal, prog, week, allStats] = await Promise.all([
         getActiveSubject(),
@@ -78,12 +78,14 @@ export default function DashboardScreen() {
     } catch (e) {
       console.error('Failed to load dashboard:', e);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadDashboardData();
-    }, [dataVersion])
+      if (dataVersion >= 0) {
+        loadDashboardData();
+      }
+    }, [loadDashboardData, dataVersion])
   );
 
   const onRefresh = async () => {
@@ -117,7 +119,6 @@ export default function DashboardScreen() {
   // Check if current hour is past 9 PM (21:00)
   const currentHour = new Date().getHours();
   const isPast9PM = currentHour >= 21;
-  const isMorningTime = currentHour >= 5 && currentHour < 12;
 
   const prepDay = calculatePrepDay(settings?.prep_start_date);
   const daysLeft = calculateDaysRemaining(settings?.target_exam_date);
@@ -263,7 +264,7 @@ export default function DashboardScreen() {
                   <Text style={styles.heroBadgeText}>TOP PRIORITY (#1)</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => startTimer('cs_active', 'study')}
+                  onPress={() => startTimer(activeSubject.id, 'lecture')}
                   style={styles.timerChip}
                 >
                   <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
@@ -330,7 +331,7 @@ export default function DashboardScreen() {
 
         {/* Today's Target vs Achieved Progress Ring Card */}
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionHeader}>TODAY'S TARGET VS ACHIEVED</Text>
+          <Text style={styles.sectionHeader}>{"TODAY'S TARGET VS ACHIEVED"}</Text>
           <Card3D gradient={Gradients.cardGlassDark as any} style={styles.targetStatusCard}>
             <View style={styles.targetStatusRow}>
               {/* Circular Progress Ring */}

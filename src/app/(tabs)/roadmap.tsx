@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../stores/appStore';
 import {
@@ -24,7 +23,7 @@ import {
   updateSubjectDetails,
 } from '../../db/database';
 import { Subject } from '../../types';
-import { Colors, Gradients } from '../../constants/theme';
+import { Colors } from '../../constants/theme';
 import { Card3D } from '../../components/Card3D';
 
 export default function QueueScreen() {
@@ -39,19 +38,21 @@ export default function QueueScreen() {
   const [editIsEstimated, setEditIsEstimated] = useState(false);
   const [editTotalDpps, setEditTotalDpps] = useState('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const list = await getSubjectsInQueue();
       setSubjects(list);
     } catch (e) {
       console.error('Error loading subjects queue:', e);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [dataVersion])
+      if (dataVersion >= 0) {
+        loadData();
+      }
+    }, [loadData, dataVersion])
   );
 
   const triggerHaptic = () => {

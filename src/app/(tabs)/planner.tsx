@@ -17,7 +17,6 @@ import {
   getTodayGoals,
   getTodayProgress,
   getWeeklyActivity,
-  getSubjectsInQueue,
   updateSubjectProgress,
   getActiveSubject,
 } from '../../db/database';
@@ -34,36 +33,35 @@ export default function PlannerScreen() {
   const [todayProgress, setTodayProgress] = useState<DailyProgress | null>(null);
   const [weeklyActivity, setWeeklyActivity] = useState<DayActivity[]>([]);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
 
   // Modals
   const [morningModalVisible, setMorningModalVisible] = useState(false);
   const [nightModalVisible, setNightModalVisible] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const [goal, prog, week, activeSubj, allSubjs] = await Promise.all([
+      const [goal, prog, week, activeSubj] = await Promise.all([
         getTodayGoals(),
         getTodayProgress(),
         getWeeklyActivity(7),
         getActiveSubject(),
-        getSubjectsInQueue(),
       ]);
 
       setTodayGoal(goal);
       setTodayProgress(prog);
       setWeeklyActivity(week);
       setActiveSubject(activeSubj);
-      setSubjects(allSubjs);
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [dataVersion])
+      if (dataVersion >= 0) {
+        loadData();
+      }
+    }, [loadData, dataVersion])
   );
 
   const triggerHaptic = () => {
@@ -173,7 +171,7 @@ export default function PlannerScreen() {
           >
             <View style={styles.focusHeader}>
               <View style={styles.focusPill}>
-                <Text style={styles.focusPillText}>TODAY'S ACTIVE SUBJECT</Text>
+                <Text style={styles.focusPillText}>{"TODAY'S ACTIVE SUBJECT"}</Text>
               </View>
               <Text style={styles.focusCode}>{activeSubject.code}</Text>
             </View>
@@ -185,7 +183,7 @@ export default function PlannerScreen() {
         )}
 
         {/* Today's 4 Core Deliverables */}
-        <Text style={styles.sectionTitle}>TODAY'S 4 CORE TARGETS</Text>
+        <Text style={styles.sectionTitle}>{"TODAY'S 4 CORE TARGETS"}</Text>
 
         {/* 1. Lectures Target */}
         <Card3D gradient={Gradients.cyberViolet as any} style={styles.targetCard}>

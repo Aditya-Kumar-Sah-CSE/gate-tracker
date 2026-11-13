@@ -44,40 +44,44 @@ export function NightReviewModal({
   const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
 
   useEffect(() => {
-    if (visible) {
-      loadData();
-    }
-  }, [visible]);
+    if (!visible) return;
+    let active = true;
 
-  const loadData = async () => {
-    try {
-      const [subjList, activeSubj, prog, goal] = await Promise.all([
-        getSubjectsInQueue(),
-        getActiveSubject(),
-        getTodayProgress(),
-        getTodayGoals(),
-      ]);
+    (async () => {
+      try {
+        const [subjList, activeSubj, prog, goal] = await Promise.all([
+          getSubjectsInQueue(),
+          getActiveSubject(),
+          getTodayProgress(),
+          getTodayGoals(),
+        ]);
 
-      setSubjects(subjList);
-      setSelectedSubjectId(activeSubj?.id || (subjList[0]?.id ?? ''));
-      setTodayGoal(goal);
+        if (!active) return;
+        setSubjects(subjList);
+        setSelectedSubjectId(activeSubj?.id || (subjList[0]?.id ?? ''));
+        setTodayGoal(goal);
 
-      // Pre-fill with existing today progress if recorded
-      setLecturesDone(prog.lectures_completed || goal.target_lectures);
-      setDppsDone(prog.dpps_completed || goal.target_dpps);
-      setPyqsDone(prog.pyqs_attempted || goal.target_pyqs);
-      setStudyHours(
-        prog.total_study_seconds > 0
-          ? Math.round((prog.total_study_seconds / 3600) * 10) / 10
-          : Math.round(goal.target_study_minutes / 60)
-      );
-      if (prog.reflection_notes) {
-        setReflection(prog.reflection_notes);
+        // Pre-fill with existing today progress if recorded
+        setLecturesDone(prog.lectures_completed || goal.target_lectures);
+        setDppsDone(prog.dpps_completed || goal.target_dpps);
+        setPyqsDone(prog.pyqs_attempted || goal.target_pyqs);
+        setStudyHours(
+          prog.total_study_seconds > 0
+            ? Math.round((prog.total_study_seconds / 3600) * 10) / 10
+            : Math.round(goal.target_study_minutes / 60)
+        );
+        if (prog.reflection_notes) {
+          setReflection(prog.reflection_notes);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [visible]);
 
   const calculateScore = () => {
     if (!todayGoal) return 100;
@@ -134,7 +138,7 @@ export function NightReviewModal({
                 <Text style={styles.headerIcon}>🌙</Text>
                 <View>
                   <Text style={styles.headerTitle}>9:00 PM Night Check-In</Text>
-                  <Text style={styles.headerSubtitle}>Log today's GATE preparation achievements</Text>
+                  <Text style={styles.headerSubtitle}>{"Log today's GATE preparation achievements"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -150,7 +154,7 @@ export function NightReviewModal({
               style={styles.scoreBanner}
             >
               <View style={styles.scoreTextCol}>
-                <Text style={styles.scoreLabel}>TODAY'S TARGET ACHIEVED</Text>
+                <Text style={styles.scoreLabel}>{"TODAY'S TARGET ACHIEVED"}</Text>
                 <Text style={styles.scoreSub}>
                   {score >= 90
                     ? '🔥 Outstanding! Full preparation targets crushed.'
@@ -331,7 +335,7 @@ export function NightReviewModal({
             </Card3D>
 
             {/* Reflection Note */}
-            <Text style={styles.sectionTitle}>TODAY'S KEY TAKEAWAY / MISTAKE NOTICED:</Text>
+            <Text style={styles.sectionTitle}>{"TODAY'S KEY TAKEAWAY / MISTAKE NOTICED:"}</Text>
             <TextInput
               style={styles.textInput}
               placeholder="e.g., Mastered DFA minimization, need more practice on pointers..."
@@ -351,7 +355,7 @@ export function NightReviewModal({
                 style={styles.saveBtnGradient}
               >
                 <Ionicons name="flame" size={20} color="#FFD700" />
-                <Text style={styles.saveBtnText}>CONFIRM & SAVE TODAY'S STREAK 🔥</Text>
+                <Text style={styles.saveBtnText}>{"CONFIRM & SAVE TODAY'S STREAK 🔥"}</Text>
               </LinearGradient>
             </TouchableOpacity>
 

@@ -128,7 +128,6 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   if (!appliedVersions.has(2)) {
     await db.withTransactionAsync(async () => {
       const now = new Date().toISOString();
-      const today = now.slice(0, 10);
 
       // Check if columns exist in subjects table, add them if missing
       const subjectCols = await db.getAllAsync<{ name: string }>(

@@ -37,31 +37,35 @@ export function MorningTargetModal({
   const [targetHours, setTargetHours] = useState<number>(8);
 
   useEffect(() => {
-    if (visible) {
-      loadSubjects();
-      if (currentGoal) {
-        setTargetLectures(currentGoal.target_lectures);
-        setTargetDpps(currentGoal.target_dpps);
-        setTargetPyqs(currentGoal.target_pyqs);
-        setTargetHours(Math.round(currentGoal.target_study_minutes / 60));
-        if (currentGoal.focus_subject_id) {
-          setSelectedSubjectId(currentGoal.focus_subject_id);
-        }
-      }
-    }
-  }, [visible, currentGoal]);
+    if (!visible) return;
+    let active = true;
 
-  const loadSubjects = async () => {
-    try {
-      const list = await getSubjectsInQueue();
-      setSubjects(list);
-      if (list.length > 0 && !currentGoal?.focus_subject_id) {
-        setSelectedSubjectId(list[0].id);
+    (async () => {
+      try {
+        const list = await getSubjectsInQueue();
+        if (!active) return;
+        setSubjects(list);
+
+        if (currentGoal) {
+          setTargetLectures(currentGoal.target_lectures);
+          setTargetDpps(currentGoal.target_dpps);
+          setTargetPyqs(currentGoal.target_pyqs);
+          setTargetHours(Math.round(currentGoal.target_study_minutes / 60));
+          if (currentGoal.focus_subject_id) {
+            setSelectedSubjectId(currentGoal.focus_subject_id);
+          }
+        } else if (list.length > 0) {
+          setSelectedSubjectId(list[0].id);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [visible, currentGoal]);
 
   const handleSave = async () => {
     try {
@@ -104,7 +108,7 @@ export function MorningTargetModal({
                 <Text style={styles.headerIcon}>🌅</Text>
                 <View>
                   <Text style={styles.headerTitle}>Morning Kickoff</Text>
-                  <Text style={styles.headerSubtitle}>Set today's GATE preparation target</Text>
+                  <Text style={styles.headerSubtitle}>{"Set today's GATE preparation target"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -288,7 +292,7 @@ export function MorningTargetModal({
             {/* Motivational Footer */}
             <View style={styles.quoteBox}>
               <Text style={styles.quoteText}>
-                ⚡ "Consistency in lectures + DPPs every single morning guarantees GATE 2027 success."
+                {'⚡ "Consistency in lectures + DPPs every single morning guarantees GATE 2027 success."'}
               </Text>
             </View>
 
@@ -301,7 +305,7 @@ export function MorningTargetModal({
                 style={styles.saveBtnGradient}
               >
                 <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.saveBtnText}>LOCK TODAY'S TARGET 🚀</Text>
+                <Text style={styles.saveBtnText}>{"LOCK TODAY'S TARGET 🚀"}</Text>
               </LinearGradient>
             </TouchableOpacity>
 

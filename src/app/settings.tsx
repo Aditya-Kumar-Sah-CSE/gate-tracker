@@ -91,39 +91,40 @@ export default function SettingsScreen() {
   };
 
   const handleImportBackupConfirm = () => {
-    Alert.prompt
-      ? Alert.prompt(
-          'Import JSON Backup',
-          'Paste your valid JSON backup string below to restore all records:',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Restore Data',
-              onPress: async (text) => {
-                if (!text) return;
-                await runImport(text);
-              }
+    if (Platform.OS === 'ios' && 'prompt' in Alert) {
+      (Alert as any).prompt(
+        'Import JSON Backup',
+        'Paste your valid JSON backup string below to restore all records:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Restore Data',
+            onPress: async (text?: string) => {
+              if (!text) return;
+              await runImport(text);
             }
-          ],
-          'plain-text'
-        )
-      : Alert.alert(
-          'Restore Data',
-          'Ensure your backup JSON file was exported from GATE TRACK 90. Press Confirm to test restore integrity.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Confirm',
-              onPress: async () => {
-                // If Alert.prompt not supported on Android, provide graceful validation
-                Alert.alert(
-                  'Android JSON Restore',
-                  'To import, place your backup file in the app documents folder or paste via prompt. Backup integrity verification is active.'
-                );
-              }
+          }
+        ],
+        'plain-text'
+      );
+    } else {
+      Alert.alert(
+        'Restore Data',
+        'Ensure your backup JSON file was exported from GATE TRACK 90. Press Confirm to test restore integrity.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Confirm',
+            onPress: async () => {
+              Alert.alert(
+                'Android JSON Restore',
+                'To import, place your backup file in the app documents folder or paste via prompt. Backup integrity verification is active.'
+              );
             }
-          ]
-        );
+          }
+        ]
+      );
+    }
   };
 
   const runImport = async (jsonStr: string) => {
