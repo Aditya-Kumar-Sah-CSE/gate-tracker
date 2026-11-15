@@ -239,7 +239,7 @@ export default function DashboardScreen() {
                 style={styles.versionBadge}
                 activeOpacity={0.8}
               >
-                <Text style={styles.versionBadgeText}>v1.3.5 🚀</Text>
+                <Text style={styles.versionBadgeText}>v1.3.6 🚀</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>

@@ -15,8 +15,8 @@ export interface AppUpdateInfo {
 }
 
 // Current App Version Constants
-export const APP_VERSION = Constants.expoConfig?.version || '1.3.4';
-export const APP_VERSION_CODE = Constants.expoConfig?.android?.versionCode || 8;
+export const APP_VERSION = Constants.expoConfig?.version || '1.3.6';
+export const APP_VERSION_CODE = Constants.expoConfig?.android?.versionCode || 10;
 
 const REMOTE_VERSION_JSON_URL =
   'https://raw.githubusercontent.com/Aditya-Kumar-Sah-CSE/gate-tracker/main/version.json';

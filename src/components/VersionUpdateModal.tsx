@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.5</Text>
-                  <Text style={styles.headerSubtitle}>{"Add/Delete Subjects • Clean Home • Direct Updater"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.6</Text>
+                  <Text style={styles.headerSubtitle}>{"Pure 3 Pillars • Clean 9 PM Review • Direct Updater"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>

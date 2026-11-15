@@ -733,7 +733,7 @@ export async function saveNightReview(review: {
   dpps_completed: number;
   pyqs_attempted: number;
   pyqs_correct: number;
-  study_hours: number;
+  study_hours?: number;
   reflection_notes?: string;
   subject_id?: string;
 }): Promise<DailyProgress> {
@@ -741,7 +741,7 @@ export async function saveNightReview(review: {
   const today = getTodayDateString();
   const now = new Date().toISOString();
 
-  const totalStudySeconds = Math.round(review.study_hours * 3600);
+  const totalStudySeconds = review.study_hours != null ? Math.round(review.study_hours * 3600) : 0;
 
   const goals = await getTodayGoals();
   const lPct = goals.target_lectures > 0 ? (review.lectures_completed / goals.target_lectures) * 100 : 0;

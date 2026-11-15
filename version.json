@@ -1,13 +1,12 @@
 {
-  "version": "1.3.5",
-  "versionCode": 9,
+  "version": "1.3.6",
+  "versionCode": 10,
   "releaseDate": "2026-11-15",
-  "releaseTitle": "v1.3.5 • Add/Delete Subjects, Clean Dashboard & Direct Updater",
+  "releaseTitle": "v1.3.6 • Removed Study Time from Night Review",
   "releaseNotes": [
-    "Removed circular 1-12 nodes wheel from Home screen for clean, fast dashboard",
-    "Added Add New Subject feature (+ button, code, lectures, DPPs, estimated toggle)",
-    "Added Delete Subject feature with 3D confirmation modal",
-    "Fixed update download: directly opens system downloader/browser without share sheet"
+    "Removed Study Hours from 9 PM Night Check-in (strictly 3 pillars: Lectures, DPPs, PYQs)",
+    "Cleaned Night Review celebration modal to focus purely on daily concrete deliverables",
+    "Preserved streak tracking and reflection notes"
   ],
   "downloadUrl": "https://github.com/Aditya-Kumar-Sah-CSE/gate-tracker/raw/main/GATE_TRACK_90.apk",
   "releasesUrl": "https://github.com/Aditya-Kumar-Sah-CSE/gate-tracker/releases",

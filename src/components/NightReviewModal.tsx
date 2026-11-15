@@ -41,7 +41,6 @@ export function NightReviewModal({
   const [lecturesDone, setLecturesDone] = useState<number>(0);
   const [dppsDone, setDppsDone] = useState<number>(0);
   const [pyqsDone, setPyqsDone] = useState<number>(0);
-  const [studyHours, setStudyHours] = useState<number>(8);
   const [reflection, setReflection] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
@@ -71,11 +70,6 @@ export function NightReviewModal({
         setLecturesDone(prog.lectures_completed || goal.target_lectures);
         setDppsDone(prog.dpps_completed || goal.target_dpps);
         setPyqsDone(prog.pyqs_attempted || goal.target_pyqs);
-        setStudyHours(
-          prog.total_study_seconds > 0
-            ? Math.round((prog.total_study_seconds / 3600) * 10) / 10
-            : Math.round(goal.target_study_minutes / 60)
-        );
         if (prog.reflection_notes) {
           setReflection(prog.reflection_notes);
         }
@@ -110,7 +104,7 @@ export function NightReviewModal({
         dpps_completed: dppsDone,
         pyqs_attempted: pyqsDone,
         pyqs_correct: Math.round(pyqsDone * 0.8), // Estimated 80% if not individually logged
-        study_hours: studyHours,
+        study_hours: 0,
         reflection_notes: reflection,
         subject_id: selectedSubjectId || undefined,
       });
@@ -202,7 +196,7 @@ export function NightReviewModal({
                     Subject: {selectedSubj.name}
                   </Text>
                   <Text style={styles.selectedBannerSub}>
-                    {"Today's Targets: "}{todayGoal?.target_lectures ?? 5}L • {todayGoal?.target_dpps ?? 2}D • {todayGoal?.target_pyqs ?? 20}P • {Math.round((todayGoal?.target_study_minutes || 480) / 60)}h
+                    {"Today's Targets: "}{todayGoal?.target_lectures ?? 5}L • {todayGoal?.target_dpps ?? 2}D • {todayGoal?.target_pyqs ?? 20}P
                   </Text>
                 </View>
               </View>
@@ -341,37 +335,6 @@ export function NightReviewModal({
               </View>
             </Card3D>
 
-            {/* 4. Study Hours */}
-            <Card3D gradient={Gradients.solarGold as any} style={styles.cardItem}>
-              <View style={styles.itemRow}>
-                <View>
-                  <Text style={styles.itemTitle}>TOTAL STUDY HOURS</Text>
-                  <Text style={styles.itemGoal}>Deep study focus time</Text>
-                </View>
-                <View style={styles.counterRow}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      setStudyHours((v) => Math.max(1, Math.round((v - 0.5) * 10) / 10));
-                    }}
-                    style={styles.counterBtn}
-                  >
-                    <Ionicons name="remove" size={18} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <Text style={styles.counterVal}>{studyHours}h</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      setStudyHours((v) => Math.round((v + 0.5) * 10) / 10);
-                    }}
-                    style={styles.counterBtn}
-                  >
-                    <Ionicons name="add" size={18} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Card3D>
-
             {/* Reflection Note */}
             <Text style={styles.sectionTitle}>{"TODAY'S KEY TAKEAWAY / MISTAKE NOTICED:"}</Text>
             <TextInput
@@ -437,12 +400,6 @@ export function NightReviewModal({
           label: 'GATE PYQs',
           value: pyqsDone,
           color: '#10B981',
-        },
-        {
-          icon: 'time',
-          label: 'Focused Study',
-          value: `${studyHours}h`,
-          color: '#F59E0B',
         },
       ]}
       streakText="Daily streak is recorded! 🔥 Sleep well and recharge for tomorrow's mission."
