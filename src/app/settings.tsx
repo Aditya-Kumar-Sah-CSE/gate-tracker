@@ -358,6 +358,23 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* App Version Info Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="information-circle-outline" size={18} color="#C084FC" />
+          <Text style={styles.cardTitle}>App Information</Text>
+        </View>
+        <View style={styles.versionRow}>
+          <View>
+            <Text style={styles.versionTitle}>GATE TRACK 90</Text>
+            <Text style={styles.versionSub}>Release Version 1.1.0 (Build 2)</Text>
+          </View>
+          <View style={styles.versionTag}>
+            <Text style={styles.versionTagText}>LATEST</Text>
+          </View>
+        </View>
+      </View>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -535,5 +552,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#10B981',
+  },
+  versionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  versionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  versionSub: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  versionTag: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  versionTagText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

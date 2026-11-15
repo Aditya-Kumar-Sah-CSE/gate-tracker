@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,9 @@ import { Card3D } from '../../components/Card3D';
 import { CircularProgress } from '../../components/CircularProgress';
 import { MorningTargetModal } from '../../components/MorningTargetModal';
 import { NightReviewModal } from '../../components/NightReviewModal';
+import { VersionUpdateModal } from '../../components/VersionUpdateModal';
+
+let hasAutoShownVersion = false;
 
 export default function DashboardScreen() {
   const { settings, dataVersion, triggerRefresh, startTimer } = useAppStore();
@@ -58,6 +61,18 @@ export default function DashboardScreen() {
   // Modals
   const [morningModalVisible, setMorningModalVisible] = useState(false);
   const [nightModalVisible, setNightModalVisible] = useState(false);
+  const [versionModalVisible, setVersionModalVisible] = useState(false);
+
+  // Auto-pop version update modal once on initial app launch
+  useEffect(() => {
+    if (!hasAutoShownVersion) {
+      hasAutoShownVersion = true;
+      const timer = setTimeout(() => {
+        setVersionModalVisible(true);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -164,7 +179,16 @@ export default function DashboardScreen() {
         {/* Top Header */}
         <View style={styles.topHeader}>
           <View>
-            <Text style={styles.appTitle}>GATE TRACK 90</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.appTitle}>GATE TRACK 90</Text>
+              <TouchableOpacity
+                onPress={() => setVersionModalVisible(true)}
+                style={styles.versionBadge}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.versionBadgeText}>v1.1.0 🚀</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.subtitle}>
               Day {prepDay.day} of 90 • {daysLeft} Days to GATE 2027
             </Text>
@@ -535,6 +559,12 @@ export default function DashboardScreen() {
           triggerRefresh();
         }}
       />
+
+      {/* Version v1.1.0 Update Modal */}
+      <VersionUpdateModal
+        visible={versionModalVisible}
+        onClose={() => setVersionModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -562,6 +592,19 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.4,
+  },
+  versionBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  versionBadgeText: {
+    color: '#C084FC',
+    fontSize: 10,
+    fontWeight: '800',
   },
   subtitle: {
     color: '#94A3B8',
