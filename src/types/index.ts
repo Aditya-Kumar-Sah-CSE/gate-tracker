@@ -53,7 +53,7 @@ export interface Subject {
   pyqs_correct: number;
   pyqs_target: number;
   is_active: number; // 1 = Currently active
-  status: 'in_queue' | 'active' | 'completed';
+  status: 'in_queue' | 'active' | 'completed' | 'doing' | 'done';
   created_at: string;
 }
 

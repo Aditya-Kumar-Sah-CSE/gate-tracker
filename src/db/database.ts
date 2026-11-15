@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { runMigrations } from './migrations';
+import { runMigrations, seedDefaultSubjects } from './migrations';
 import {
   AppSettings,
   Subject,
@@ -97,16 +97,23 @@ export async function updateAppSettings(settings: Partial<AppSettings>): Promise
 // ----------------------------------------------------
 export async function getSubjectsInQueue(): Promise<Subject[]> {
   const db = await getDatabase();
-  return db.getAllAsync<Subject>(
+  let subjects = await db.getAllAsync<Subject>(
     'SELECT * FROM subjects ORDER BY queue_order ASC, name ASC;'
   );
+  if (!subjects || subjects.length === 0) {
+    await seedDefaultSubjects(db, true);
+    subjects = await db.getAllAsync<Subject>(
+      'SELECT * FROM subjects ORDER BY queue_order ASC, name ASC;'
+    );
+  }
+  return subjects;
 }
 
 export async function getActiveSubject(): Promise<Subject | null> {
   const db = await getDatabase();
-  // First check if a subject is explicitly marked active
+  // First check if a subject is explicitly marked active or doing
   let active = await db.getFirstAsync<Subject>(
-    'SELECT * FROM subjects WHERE is_active = 1 ORDER BY queue_order ASC LIMIT 1;'
+    'SELECT * FROM subjects WHERE is_active = 1 OR status = "doing" OR status = "active" ORDER BY queue_order ASC LIMIT 1;'
   );
   if (!active) {
     // Top of queue is active
@@ -114,7 +121,47 @@ export async function getActiveSubject(): Promise<Subject | null> {
       'SELECT * FROM subjects ORDER BY queue_order ASC LIMIT 1;'
     );
   }
+  if (!active) {
+    await seedDefaultSubjects(db, true);
+    active = await db.getFirstAsync<Subject>(
+      'SELECT * FROM subjects WHERE is_active = 1 OR status = "doing" OR status = "active" ORDER BY queue_order ASC LIMIT 1;'
+    );
+  }
   return active || null;
+}
+
+export async function toggleSubjectStatus(
+  subjectId: string,
+  newStatus: 'doing' | 'done'
+): Promise<Subject> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const subj = await db.getFirstAsync<Subject>('SELECT * FROM subjects WHERE id = ?;', [subjectId]);
+    if (!subj) return;
+
+    if (newStatus === 'done') {
+      await db.runAsync(
+        'UPDATE subjects SET status = "done", is_active = 0 WHERE id = ?;',
+        [subjectId]
+      );
+    } else {
+      // Mark as doing and make this active
+      await db.runAsync('UPDATE subjects SET is_active = 0 WHERE is_active = 1;');
+      await db.runAsync(
+        'UPDATE subjects SET status = "doing", is_active = 1 WHERE id = ?;',
+        [subjectId]
+      );
+    }
+  });
+
+  const updated = await db.getFirstAsync<Subject>('SELECT * FROM subjects WHERE id = ?;', [subjectId]);
+  return updated!;
+}
+
+export async function resetAllSubjectsToDefault(): Promise<Subject[]> {
+  const db = await getDatabase();
+  await seedDefaultSubjects(db, true);
+  return getSubjectsInQueue();
 }
 
 export async function setSubjectActive(subjectId: string): Promise<void> {
@@ -136,9 +183,9 @@ export async function setSubjectActive(subjectId: string): Promise<void> {
       );
     }
 
-    await db.runAsync('UPDATE subjects SET is_active = 0, status = "in_queue";');
+    await db.runAsync('UPDATE subjects SET is_active = 0 WHERE is_active = 1;');
     await db.runAsync(
-      'UPDATE subjects SET is_active = 1, status = "active", queue_order = 1 WHERE id = ?;',
+      'UPDATE subjects SET is_active = 1, status = "doing", queue_order = 1 WHERE id = ?;',
       [subjectId]
     );
   });

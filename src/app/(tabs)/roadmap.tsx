@@ -21,6 +21,8 @@ import {
   setSubjectActive,
   updateSubjectProgress,
   updateSubjectDetails,
+  toggleSubjectStatus,
+  resetAllSubjectsToDefault,
 } from '../../db/database';
 import { Subject } from '../../types';
 import { Colors } from '../../constants/theme';
@@ -40,7 +42,10 @@ export default function QueueScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const list = await getSubjectsInQueue();
+      let list = await getSubjectsInQueue();
+      if (!list || list.length === 0) {
+        list = await resetAllSubjectsToDefault();
+      }
       setSubjects(list);
     } catch (e) {
       console.error('Error loading subjects queue:', e);
@@ -59,6 +64,20 @@ export default function QueueScreen() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+  };
+
+  const handleToggleStatus = async (subjectId: string, newStatus: 'doing' | 'done') => {
+    triggerHaptic();
+    await toggleSubjectStatus(subjectId, newStatus);
+    await loadData();
+    triggerRefresh();
+  };
+
+  const handleResetSubjects = async () => {
+    triggerHaptic();
+    const list = await resetAllSubjectsToDefault();
+    setSubjects(list);
+    triggerRefresh();
   };
 
   const handleMove = async (subjectId: string, direction: 'up' | 'down') => {
@@ -123,14 +142,20 @@ export default function QueueScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>GATE Study Queue</Text>
             <Text style={styles.headerSubtitle}>
-              Organize subjects in your priority order • #1 is Active
+              Organize subjects in your priority order • Side toggle: Doing / Done
             </Text>
           </View>
-          <View style={styles.subjectCountBadge}>
-            <Text style={styles.subjectCountText}>{subjects.length} Subjects</Text>
+          <View style={styles.headerRightActions}>
+            <View style={styles.subjectCountBadge}>
+              <Text style={styles.subjectCountText}>{subjects.length} Subjects</Text>
+            </View>
+            <TouchableOpacity onPress={handleResetSubjects} style={styles.reloadBtn} activeOpacity={0.8}>
+              <Ionicons name="refresh" size={13} color="#38BDF8" />
+              <Text style={styles.reloadBtnText}>Reload 12</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -173,7 +198,7 @@ export default function QueueScreen() {
                   },
                 ]}
               >
-                {/* Card Top Row: Rank, Title, Queue Buttons */}
+                {/* Card Top Row: Rank, Title, Side Toggle (Doing/Done), Queue Buttons */}
                 <View style={styles.cardHeader}>
                   <View style={styles.titleGroup}>
                     <View
@@ -197,6 +222,66 @@ export default function QueueScreen() {
                     </View>
                   </View>
 
+                  {/* SIDE TOGGLE: DOING vs DONE */}
+                  <View style={styles.statusToggleContainer}>
+                    <TouchableOpacity
+                      onPress={() => handleToggleStatus(subj.id, 'doing')}
+                      style={[
+                        styles.togglePill,
+                        (subj.status === 'doing' || (isActive && subj.status !== 'done'))
+                          ? styles.toggleDoingActive
+                          : styles.toggleInactive,
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={
+                          (subj.status === 'doing' || (isActive && subj.status !== 'done'))
+                            ? 'flash'
+                            : 'flash-outline'
+                        }
+                        size={11}
+                        color={
+                          (subj.status === 'doing' || (isActive && subj.status !== 'done'))
+                            ? '#FFFFFF'
+                            : '#94A3B8'
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.togglePillText,
+                          (subj.status === 'doing' || (isActive && subj.status !== 'done')) &&
+                            styles.togglePillTextActive,
+                        ]}
+                      >
+                        Doing
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleToggleStatus(subj.id, 'done')}
+                      style={[
+                        styles.togglePill,
+                        subj.status === 'done' ? styles.toggleDoneActive : styles.toggleInactive,
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={subj.status === 'done' ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                        size={11}
+                        color={subj.status === 'done' ? '#FFFFFF' : '#94A3B8'}
+                      />
+                      <Text
+                        style={[
+                          styles.togglePillText,
+                          subj.status === 'done' && styles.togglePillTextActive,
+                        ]}
+                      >
+                        Done
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
                   {/* Actions: Up, Down, Edit */}
                   <View style={styles.actionGroup}>
                     {!isFirst && (
@@ -204,7 +289,7 @@ export default function QueueScreen() {
                         onPress={() => handleMove(subj.id, 'up')}
                         style={styles.iconBtn}
                       >
-                        <Ionicons name="arrow-up" size={16} color="#FFFFFF" />
+                        <Ionicons name="arrow-up" size={14} color="#FFFFFF" />
                       </TouchableOpacity>
                     )}
                     {!isLast && (
@@ -212,14 +297,14 @@ export default function QueueScreen() {
                         onPress={() => handleMove(subj.id, 'down')}
                         style={styles.iconBtn}
                       >
-                        <Ionicons name="arrow-down" size={16} color="#FFFFFF" />
+                        <Ionicons name="arrow-down" size={14} color="#FFFFFF" />
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
                       onPress={() => openEdit(subj)}
                       style={styles.iconBtn}
                     >
-                      <Ionicons name="pencil" size={14} color="#FFFFFF" />
+                      <Ionicons name="pencil" size={13} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -454,6 +539,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  reloadBtnText: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   subjectCountBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: 10,
@@ -510,6 +616,41 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 11,
     fontWeight: '600',
+  },
+  statusToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderRadius: 10,
+    padding: 2,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  togglePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  toggleDoingActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  toggleDoneActive: {
+    backgroundColor: '#10B981',
+  },
+  toggleInactive: {
+    backgroundColor: 'transparent',
+  },
+  togglePillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  togglePillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   actionGroup: {
     flexDirection: 'row',

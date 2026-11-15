@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Subject, DailyGoal } from '../types';
 import { getSubjectsInQueue, saveMorningGoals } from '../db/database';
+import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 import { Colors, Gradients } from '../constants/theme';
 import { Card3D } from './Card3D';
 
@@ -92,6 +93,10 @@ export function MorningTargetModal({
     }
   };
 
+  const displaySubjects: Subject[] =
+    subjects.length > 0 ? subjects : (DEFAULT_GATE_SUBJECTS as unknown as Subject[]);
+  const selectedSubj = displaySubjects.find((s) => s.id === selectedSubjectId) || displaySubjects[0];
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
@@ -118,11 +123,32 @@ export function MorningTargetModal({
           </LinearGradient>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Focus Subject Picker */}
-            <Text style={styles.sectionTitle}>1. FOCUS SUBJECT (TOP OF QUEUE)</Text>
+            {/* Step 1: Focus Subject Picker */}
+            <View style={styles.stepHeaderRow}>
+              <View style={styles.stepNumberBadge}>
+                <Text style={styles.stepNumberText}>STEP 1</Text>
+              </View>
+              <Text style={styles.sectionTitle}>{"SELECT TODAY'S SUBJECT TO STUDY"}</Text>
+            </View>
+
+            {/* Selected Subject Banner */}
+            {selectedSubj && (
+              <View style={[styles.selectedBanner, { borderColor: selectedSubj.color }]}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.selectedBannerTitle}>
+                    Focusing on: {selectedSubj.name}
+                  </Text>
+                  <Text style={styles.selectedBannerSub}>
+                    {selectedSubj.total_lectures} Total Lectures • {selectedSubj.total_dpps} DPP Sheets • Status: {selectedSubj.status ? selectedSubj.status.toUpperCase() : 'IN QUEUE'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectScroll}>
-              {subjects.map((subj) => {
-                const isSelected = subj.id === selectedSubjectId;
+              {displaySubjects.map((subj) => {
+                const isSelected = subj.id === (selectedSubj?.id || selectedSubjectId);
                 return (
                   <TouchableOpacity
                     key={subj.id}
@@ -136,9 +162,9 @@ export function MorningTargetModal({
                         backgroundColor: subj.color,
                         borderColor: '#FFFFFF',
                         shadowColor: subj.color,
-                        shadowOpacity: 0.6,
-                        shadowRadius: 10,
-                        elevation: 6,
+                        shadowOpacity: 0.7,
+                        shadowRadius: 12,
+                        elevation: 8,
                       },
                     ]}
                   >
@@ -147,23 +173,39 @@ export function MorningTargetModal({
                       size={18}
                       color={isSelected ? '#FFFFFF' : subj.color}
                     />
-                    <Text
-                      style={[
-                        styles.subjectChipText,
-                        isSelected && { color: '#FFFFFF', fontWeight: '700' },
-                      ]}
-                    >
-                      {subj.name}
-                    </Text>
-                    {subj.queue_order === 1 && (
-                      <View style={styles.rankBadge}>
-                        <Text style={styles.rankBadgeText}>#1</Text>
-                      </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.subjectChipText,
+                          isSelected && { color: '#FFFFFF', fontWeight: '800' },
+                        ]}
+                      >
+                        {subj.name}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.subjectChipSub,
+                          isSelected && { color: 'rgba(255, 255, 255, 0.9)' },
+                        ]}
+                      >
+                        {subj.code} • {subj.status === 'done' ? '✓ Done' : '⚡ Doing'}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" style={{ marginLeft: 4 }} />
                     )}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
+
+            {/* Step 2: Set Daily Targets */}
+            <View style={[styles.stepHeaderRow, { marginTop: 14 }]}>
+              <View style={[styles.stepNumberBadge, { backgroundColor: '#F59E0B' }]}>
+                <Text style={styles.stepNumberText}>STEP 2</Text>
+              </View>
+              <Text style={styles.sectionTitle}>{"LOCK TODAY'S DAILY TARGETS"}</Text>
+            </View>
 
             {/* Target 1: Lectures */}
             <Card3D gradient={Gradients.cyberViolet as any} style={styles.targetCard}>
@@ -371,12 +413,49 @@ const styles = StyleSheet.create({
   body: {
     padding: 18,
   },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  stepNumberBadge: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  stepNumberText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   sectionTitle: {
     color: '#94A3B8',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
+  },
+  selectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
     marginBottom: 10,
+  },
+  selectedBannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  selectedBannerSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
   },
   subjectScroll: {
     marginBottom: 16,
@@ -397,6 +476,11 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
     fontSize: 13,
     fontWeight: '600',
+  },
+  subjectChipSub: {
+    color: '#94A3B8',
+    fontSize: 10,
+    marginTop: 2,
   },
   rankBadge: {
     backgroundColor: '#000000',

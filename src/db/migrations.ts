@@ -2,7 +2,54 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import { CREATE_TABLES_SQL } from './schema';
 import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
+
+export async function seedDefaultSubjects(db: SQLiteDatabase, force: boolean = false): Promise<void> {
+  const now = new Date().toISOString();
+
+  if (!force) {
+    try {
+      const existing = await db.getAllAsync<{ id: string }>('SELECT id FROM subjects;');
+      if (existing && existing.length >= DEFAULT_GATE_SUBJECTS.length) {
+        return; // Already populated
+      }
+    } catch {
+      // Table may not exist yet, will be inserted below
+    }
+  }
+
+  for (const subj of DEFAULT_GATE_SUBJECTS) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO subjects (
+        id, code, name, icon, color, gradient_start, gradient_end,
+        queue_order, total_lectures, completed_lectures, is_lecture_count_estimated,
+        total_dpps, completed_dpps, pyqs_attempted, pyqs_correct, pyqs_target,
+        is_active, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        subj.id,
+        subj.code,
+        subj.name,
+        subj.icon,
+        subj.color,
+        subj.gradient[0],
+        subj.gradient[1],
+        subj.queue_order,
+        subj.total_lectures,
+        subj.completed_lectures,
+        subj.is_lecture_count_estimated,
+        subj.total_dpps,
+        subj.completed_dpps,
+        subj.pyqs_attempted,
+        subj.pyqs_correct,
+        subj.pyqs_target,
+        subj.is_active,
+        subj.status,
+        now,
+      ]
+    );
+  }
+}
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   // Ensure migration tracking table exists
@@ -230,5 +277,29 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
         [2, now]
       );
     });
+  }
+
+  // Migration 3: Guarantee all 12 subjects are seeded and statuses initialized
+  if (!appliedVersions.has(3)) {
+    await db.withTransactionAsync(async () => {
+      const now = new Date().toISOString();
+      await seedDefaultSubjects(db, true);
+      await db.runAsync(
+        'INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (?, ?);',
+        [3, now]
+      );
+    });
+  }
+
+  // Final Auto-Healing Check: Always verify at least 12 subjects exist
+  try {
+    const subjectCountRow = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM subjects;'
+    );
+    if (!subjectCountRow || subjectCountRow.count < DEFAULT_GATE_SUBJECTS.length) {
+      await seedDefaultSubjects(db, true);
+    }
+  } catch (err) {
+    console.error('Error during auto-healing subject verification:', err);
   }
 }

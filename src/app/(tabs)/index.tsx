@@ -22,6 +22,7 @@ import {
   getWeeklyActivity,
   getOverallStats,
   updateSubjectProgress,
+  toggleSubjectStatus,
 } from '../../db/database';
 import { Subject, DailyGoal, DailyProgress, DayActivity } from '../../types';
 import { Colors, Gradients } from '../../constants/theme';
@@ -112,6 +113,14 @@ export default function DashboardScreen() {
     } else {
       await updateSubjectProgress(subjectId, { pyqs_attempted: 1, pyqs_correct: 1 });
     }
+    await loadDashboardData();
+    triggerRefresh();
+  };
+
+  const handleToggleActiveStatus = async (newStatus: 'doing' | 'done') => {
+    if (!activeSubject) return;
+    triggerHaptic();
+    await toggleSubjectStatus(activeSubject.id, newStatus);
     await loadDashboardData();
     triggerRefresh();
   };
@@ -263,13 +272,45 @@ export default function DashboardScreen() {
                 <View style={styles.heroBadgePill}>
                   <Text style={styles.heroBadgeText}>TOP PRIORITY (#1)</Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => startTimer(activeSubject.id, 'lecture')}
-                  style={styles.timerChip}
-                >
-                  <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.timerChipText}>Timer</Text>
-                </TouchableOpacity>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {/* Status Toggle on Active Subject Card */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      handleToggleActiveStatus(
+                        activeSubject.status === 'done' ? 'doing' : 'done'
+                      )
+                    }
+                    style={[
+                      styles.heroTogglePill,
+                      activeSubject.status === 'done'
+                        ? styles.heroToggleDone
+                        : styles.heroToggleDoing,
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={
+                        activeSubject.status === 'done'
+                          ? 'checkmark-circle'
+                          : 'flash'
+                      }
+                      size={12}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.heroToggleText}>
+                      {activeSubject.status === 'done' ? 'Done' : 'Doing'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => startTimer(activeSubject.id, 'lecture')}
+                    style={styles.timerChip}
+                  >
+                    <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.timerChipText}>Timer</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <Text style={styles.heroSubjectName}>{activeSubject.name}</Text>
@@ -625,6 +666,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.6,
+  },
+  heroTogglePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  heroToggleDoing: {
+    backgroundColor: '#8B5CF6',
+  },
+  heroToggleDone: {
+    backgroundColor: '#10B981',
+  },
+  heroToggleText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   timerChip: {
     flexDirection: 'row',

@@ -20,6 +20,7 @@ import {
   getTodayProgress,
   getTodayGoals,
 } from '../db/database';
+import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 import { Colors, Gradients } from '../constants/theme';
 import { Card3D } from './Card3D';
 
@@ -58,7 +59,7 @@ export function NightReviewModal({
 
         if (!active) return;
         setSubjects(subjList);
-        setSelectedSubjectId(activeSubj?.id || (subjList[0]?.id ?? ''));
+        setSelectedSubjectId(goal.focus_subject_id || activeSubj?.id || (subjList[0]?.id ?? 'cs_cp'));
         setTodayGoal(goal);
 
         // Pre-fill with existing today progress if recorded
@@ -120,6 +121,10 @@ export function NightReviewModal({
     }
   };
 
+  const displaySubjects: Subject[] =
+    subjects.length > 0 ? subjects : (DEFAULT_GATE_SUBJECTS as unknown as Subject[]);
+  const selectedSubj = displaySubjects.find((s) => s.id === selectedSubjectId) || displaySubjects[0];
+
   const score = calculateScore();
 
   return (
@@ -169,10 +174,26 @@ export function NightReviewModal({
             </LinearGradient>
 
             {/* Subject Allocation */}
-            <Text style={styles.sectionTitle}>ALLOCATE PROGRESS TO SUBJECT:</Text>
+            <Text style={styles.sectionTitle}>{"CONFIRM ACHIEVEMENTS FOR TODAY'S SUBJECT:"}</Text>
+
+            {/* Selected Subject Banner */}
+            {selectedSubj && (
+              <View style={[styles.selectedBanner, { borderColor: selectedSubj.color }]}>
+                <Ionicons name="sparkles" size={18} color="#FFD700" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.selectedBannerTitle}>
+                    Subject: {selectedSubj.name}
+                  </Text>
+                  <Text style={styles.selectedBannerSub}>
+                    {"Today's Targets: "}{todayGoal?.target_lectures ?? 5}L • {todayGoal?.target_dpps ?? 2}D • {todayGoal?.target_pyqs ?? 20}P • {Math.round((todayGoal?.target_study_minutes || 480) / 60)}h
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectScroll}>
-              {subjects.map((subj) => {
-                const isSelected = subj.id === selectedSubjectId;
+              {displaySubjects.map((subj) => {
+                const isSelected = subj.id === (selectedSubj?.id || selectedSubjectId);
                 return (
                   <TouchableOpacity
                     key={subj.id}
@@ -200,7 +221,7 @@ export function NightReviewModal({
                     <Text
                       style={[
                         styles.subjectChipText,
-                        isSelected && { color: '#FFFFFF', fontWeight: '700' },
+                        isSelected && { color: '#FFFFFF', fontWeight: '800' },
                       ]}
                     >
                       {subj.name}
@@ -468,6 +489,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 8,
+  },
+  selectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 10,
+  },
+  selectedBannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  selectedBannerSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
   },
   subjectScroll: {
     marginBottom: 16,
