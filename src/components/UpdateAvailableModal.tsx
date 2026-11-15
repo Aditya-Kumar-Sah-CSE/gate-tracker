@@ -28,7 +28,6 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
   updateInfo,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
 
   if (!updateInfo) return null;
 
@@ -41,11 +40,9 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
   const handleDownload = async () => {
     triggerHaptic();
     setIsDownloading(true);
-    setDownloadProgress(5);
     try {
-      await downloadAndInstallUpdate(updateInfo.downloadUrl, (pct) => {
-        setDownloadProgress(pct);
-      });
+      await downloadAndInstallUpdate(updateInfo.downloadUrl);
+      onClose();
     } catch (e) {
       console.error('Update download error:', e);
       // Fallback: open release page
@@ -122,19 +119,6 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                     </View>
                   ))}
                 </View>
-
-                {/* Progress Bar during Download */}
-                {isDownloading && (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                      <Text style={styles.progressTitle}>Downloading APK Update...</Text>
-                      <Text style={styles.progressPct}>{downloadProgress}%</Text>
-                    </View>
-                    <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${downloadProgress}%` }]} />
-                    </View>
-                  </View>
-                )}
               </ScrollView>
 
               {/* Action Buttons */}
@@ -155,7 +139,7 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                       <View style={styles.btnRowLoading}>
                         <ActivityIndicator size="small" color="#FFFFFF" />
                         <Text style={styles.primaryBtnText}>
-                          DOWNLOADING ({downloadProgress}%)...
+                          OPENING DOWNLOADER...
                         </Text>
                       </View>
                     ) : (

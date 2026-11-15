@@ -34,7 +34,6 @@ import { CircularProgress } from '../../components/CircularProgress';
 import { MorningTargetModal } from '../../components/MorningTargetModal';
 import { NightReviewModal } from '../../components/NightReviewModal';
 import { VersionUpdateModal } from '../../components/VersionUpdateModal';
-import { RadialJourneyView } from '../../components/RadialJourneyView';
 import { UpdateAvailableModal } from '../../components/UpdateAvailableModal';
 import { checkForAppUpdate, AppUpdateInfo } from '../../services/updateService';
 
@@ -47,7 +46,6 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [queuedSubjects, setQueuedSubjects] = useState<Subject[]>([]);
-  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
   const [todayProgress, setTodayProgress] = useState<DailyProgress | null>(null);
   const [weeklyActivity, setWeeklyActivity] = useState<DayActivity[]>([]);
@@ -96,7 +94,6 @@ export default function DashboardScreen() {
       ]);
 
       setActiveSubject(activeSubj);
-      setAllSubjects(allSubjs);
       setQueuedSubjects(allSubjs.filter((s) => s.id !== activeSubj?.id));
       setTodayGoal(goal);
       setTodayProgress(prog);
@@ -207,10 +204,6 @@ export default function DashboardScreen() {
   const completedPyqs = todayProgress?.pyqs_attempted || 0;
   const pyqRatio = Math.min(1, targetPyqs > 0 ? completedPyqs / targetPyqs : 0);
 
-  const studySeconds = todayProgress?.total_study_seconds || 0;
-  const studyHours = Math.round((studySeconds / 3600) * 10) / 10;
-  const targetHours = todayGoal ? Math.round(todayGoal.target_study_minutes / 60) : 8;
-
   const totalScore = Math.min(
     100,
     Math.round(((lectureRatio + dppRatio + pyqRatio) / 3) * 100)
@@ -246,7 +239,7 @@ export default function DashboardScreen() {
                 style={styles.versionBadge}
                 activeOpacity={0.8}
               >
-                <Text style={styles.versionBadgeText}>v1.3.3 🚀</Text>
+                <Text style={styles.versionBadgeText}>v1.3.5 🚀</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
@@ -448,19 +441,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* CENTERPIECE: RADIAL JOURNEY WHEEL & SKILL RADAR CHART (Image 2) */}
-        <RadialJourneyView
-          subjects={allSubjects}
-          activeSubjectId={activeSubject?.id || 'cs_cp'}
-          onSelectSubject={handleSelectSubject}
-          lecturePct={Math.round(lectureRatio * 100)}
-          dppPct={Math.round(dppRatio * 100)}
-          pyqPct={Math.round(pyqRatio * 100)}
-          studyPct={Math.round(Math.min(1, studyHours / targetHours) * 100)}
-          overallPct={totalScore}
-        />
-
-        {/* ACTIVE SUBJECT MISSION CARD (Matching Lesson 15 Card in Image 2) */}
+        {/* ACTIVE SUBJECT MISSION CARD */}
         {activeSubject && (
           <View style={styles.sectionWrap}>
             <Card3D gradient={Gradients.cardGlassDark as any} style={styles.missionCard}>

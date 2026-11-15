@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.4</Text>
-                  <Text style={styles.headerSubtitle}>{"Pure 3 Pillars • 3D Confirmation • Clean UI"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.5</Text>
+                  <Text style={styles.headerSubtitle}>{"Add/Delete Subjects • Clean Home • Direct Updater"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -60,13 +60,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 1 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
-                  <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
+                  <Ionicons name="add-circle" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Pure 3 Pillars (Study Time Removed)</Text>
+                  <Text style={styles.featureTitle}>Add & Delete Subjects</Text>
                   <Text style={styles.featureDesc}>
-                    Removed study hours from Planner and Target cards. Focus is now 100% on concrete deliverables: PW Lectures, DPP Sheets, and GATE PYQs.
+                    Add your own subjects with custom lectures, DPPs, and codes. Delete finished or unwanted subjects with 3D confirmation.
                   </Text>
                 </View>
               </View>
@@ -75,13 +75,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 2 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
-                  <Ionicons name="star" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
+                  <Ionicons name="apps" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>3D Active Subject Confirmation</Text>
+                  <Text style={styles.featureTitle}>Clean & Focused Dashboard</Text>
                   <Text style={styles.featureDesc}>
-                    Switching your primary active subject now shows a radiant 3D confirmation card, preventing accidental changes to your priority queue.
+                    Removed confusing circular 1-12 node wheel from Home screen. Focus directly on today targets and active subject missions.
                   </Text>
                 </View>
               </View>
@@ -90,13 +90,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 3 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
-                  <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#06B6D4' }]}>
+                  <Ionicons name="cloud-download" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Cosmic 3D Theme & Concise UI</Text>
+                  <Text style={styles.featureTitle}>Direct APK Downloader</Text>
                   <Text style={styles.featureDesc}>
-                    No long verbose text or theory. Clean keyword-driven badges, glowing progress rings, and consistent 3D styling across every tab.
+                    Fixed update downloading: opens system browser directly to download and prompt package installer without native share sheets.
                   </Text>
                 </View>
               </View>
@@ -105,13 +105,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 4 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#06B6D4' }]}>
-                  <Ionicons name="cloud-download" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
+                  <Ionicons name="star" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>1-Tap In-App Auto-Updater</Text>
+                  <Text style={styles.featureTitle}>3D Active Focus Confirmation</Text>
                   <Text style={styles.featureDesc}>
-                    Get live update notifications and download the latest signed APK directly within the app without manual browser downloads.
+                    Switching your primary active subject prompts with a radiant 3D confirmation card, preventing accidental changes to your queue.
                   </Text>
                 </View>
               </View>

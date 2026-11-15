@@ -110,7 +110,7 @@ export async function getSubjectsInQueue(): Promise<Subject[]> {
   let subjects = await db.getAllAsync<Subject>(
     'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
   );
-  if (!subjects || subjects.length < DEFAULT_GATE_SUBJECTS.length) {
+  if (!subjects || subjects.length === 0) {
     await seedDefaultSubjects(db, true);
     subjects = await db.getAllAsync<Subject>(
       'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
@@ -342,6 +342,87 @@ export async function updateSubjectDetails(
     WHERE id = ?;`,
     [newName, newLectures, newDpps, newEstimated, subjectId]
   );
+}
+
+export async function deleteSubject(subjectId: string): Promise<Subject[]> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    // Delete the subject
+    await db.runAsync('DELETE FROM subjects WHERE id = ?;', [subjectId]);
+
+    // Re-order remaining subjects 1..N
+    const remaining = await db.getAllAsync<Subject>(
+      'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
+    );
+    for (let i = 0; i < remaining.length; i++) {
+      const order = i + 1;
+      const isAct = i === 0 ? 1 : 0;
+      await db.runAsync(
+        'UPDATE subjects SET queue_order = ?, is_active = ? WHERE id = ?;',
+        [order, isAct, remaining[i].id]
+      );
+    }
+  });
+  return getSubjectsInQueue();
+}
+
+export async function addNewSubject(params: {
+  name: string;
+  code?: string;
+  totalLectures?: number;
+  totalDpps?: number;
+  isEstimated?: boolean;
+}): Promise<Subject> {
+  const db = await getDatabase();
+  const current = await db.getAllAsync<Subject>(
+    'SELECT * FROM subjects ORDER BY queue_order ASC;'
+  );
+  const nextOrder = current.length + 1;
+  const id = `subj_${Date.now()}`;
+  const code = (params.code && params.code.trim().length > 0)
+    ? params.code.trim().toUpperCase()
+    : params.name.slice(0, 6).toUpperCase().replace(/\s+/g, '-');
+  const totalLec = Math.max(1, params.totalLectures ?? 30);
+  const totalDpps = Math.max(0, params.totalDpps ?? 10);
+  const isEst = params.isEstimated ? 1 : 0;
+
+  // Cosmic color presets
+  const colorPresets = [
+    { color: '#8B5CF6', start: '#8B5CF6', end: '#6D28D9' },
+    { color: '#3B82F6', start: '#3B82F6', end: '#1D4ED8' },
+    { color: '#10B981', start: '#10B981', end: '#047857' },
+    { color: '#F59E0B', start: '#F59E0B', end: '#D97706' },
+    { color: '#EC4899', start: '#EC4899', end: '#BE185D' },
+    { color: '#06B6D4', start: '#06B6D4', end: '#0E7490' },
+    { color: '#6366F1', start: '#6366F1', end: '#4338CA' },
+  ];
+  const chosenColor = colorPresets[current.length % colorPresets.length];
+
+  await db.runAsync(
+    `INSERT INTO subjects (
+      id, code, name, icon, color, gradient_start, gradient_end,
+      queue_order, total_lectures, completed_lectures, is_lecture_count_estimated,
+      total_dpps, completed_dpps, pyqs_attempted, pyqs_correct, pyqs_target,
+      is_active, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0, 0, 0, 100, 0, 'in_queue', ?);`,
+    [
+      id,
+      code,
+      params.name.trim(),
+      'book',
+      chosenColor.color,
+      chosenColor.start,
+      chosenColor.end,
+      nextOrder,
+      totalLec,
+      isEst,
+      totalDpps,
+      new Date().toISOString(),
+    ]
+  );
+
+  const created = await db.getFirstAsync<Subject>('SELECT * FROM subjects WHERE id = ?;', [id]);
+  return created!;
 }
 
 // ----------------------------------------------------

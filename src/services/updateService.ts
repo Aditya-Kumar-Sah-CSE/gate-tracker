@@ -1,8 +1,5 @@
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 
 export interface AppUpdateInfo {
   updateAvailable: boolean;
@@ -18,8 +15,8 @@ export interface AppUpdateInfo {
 }
 
 // Current App Version Constants
-export const APP_VERSION = Constants.expoConfig?.version || '1.3.3';
-export const APP_VERSION_CODE = Constants.expoConfig?.android?.versionCode || 7;
+export const APP_VERSION = Constants.expoConfig?.version || '1.3.4';
+export const APP_VERSION_CODE = Constants.expoConfig?.android?.versionCode || 8;
 
 const REMOTE_VERSION_JSON_URL =
   'https://raw.githubusercontent.com/Aditya-Kumar-Sah-CSE/gate-tracker/main/version.json';
@@ -117,58 +114,16 @@ export async function checkForAppUpdate(): Promise<AppUpdateInfo | null> {
 }
 
 /**
- * Downloads APK and prompts system installer or opens direct download.
+ * Directly downloads and opens the APK update in browser/system downloader.
+ * Avoids native share target dialogs completely.
  */
 export async function downloadAndInstallUpdate(
   downloadUrl: string,
   onProgress?: (progressPct: number) => void
 ): Promise<void> {
-  if (Platform.OS !== 'android') {
-    await Linking.openURL(downloadUrl);
-    return;
+  if (onProgress) {
+    onProgress(100);
   }
-
-  try {
-    const targetFile = `${FileSystem.cacheDirectory}GATE_TRACK_90_update.apk`;
-
-    // Remove existing file in cache if any
-    const fileInfo = await FileSystem.getInfoAsync(targetFile);
-    if (fileInfo.exists) {
-      await FileSystem.deleteAsync(targetFile, { idempotent: true });
-    }
-
-    const downloadResumable = FileSystem.createDownloadResumable(
-      downloadUrl,
-      targetFile,
-      {},
-      (downloadProgress) => {
-        const total = downloadProgress.totalBytesExpectedToWrite;
-        const written = downloadProgress.totalBytesWritten;
-        if (total > 0 && onProgress) {
-          const pct = Math.min(100, Math.round((written / total) * 100));
-          onProgress(pct);
-        }
-      }
-    );
-
-    const result = await downloadResumable.downloadAsync();
-    if (result && result.uri) {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri, {
-          mimeType: 'application/vnd.android.package-archive',
-          dialogTitle: 'Install GATE TRACK 90 Update',
-          UTI: 'com.android.package-archive',
-        });
-      } else {
-        await Linking.openURL(result.uri);
-      }
-      return;
-    }
-  } catch (err) {
-    console.warn('Direct in-app download fallback to browser URL:', err);
-  }
-
-  // Direct browser download fallback
   await Linking.openURL(downloadUrl);
 }
 
