@@ -8,9 +8,11 @@ import {
   TextInput,
   Switch,
   Alert,
-  Platform
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -142,8 +144,12 @@ export default function SettingsScreen() {
     }
   };
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16) + 8;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: topInset }]}>
+      <StatusBar barStyle="light-content" />
       {/* Batch Information Card */}
       <View style={styles.batchCard}>
         <View style={styles.batchHeaderRow}>
@@ -367,7 +373,7 @@ export default function SettingsScreen() {
         <View style={styles.versionRow}>
           <View>
             <Text style={styles.versionTitle}>GATE TRACK 90</Text>
-            <Text style={styles.versionSub}>Release Version 1.3.0 (Build 4)</Text>
+            <Text style={styles.versionSub}>Release Version 1.3.1 (Build 5)</Text>
           </View>
           <View style={styles.versionTag}>
             <Text style={styles.versionTagText}>LATEST</Text>

@@ -10,8 +10,10 @@ import {
   TextInput,
   Switch,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../stores/appStore';
@@ -137,12 +139,16 @@ export default function QueueScreen() {
     }
   };
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16) + 8;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: topInset }]}>
+      <StatusBar barStyle="light-content" />
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.headerTitle}>GATE Study Queue</Text>
             <Text style={styles.headerSubtitle}>
               Organize subjects in your priority order • Side toggle: Doing / Done
@@ -153,7 +159,7 @@ export default function QueueScreen() {
               <Text style={styles.subjectCountText}>{subjects.length} Subjects</Text>
             </View>
             <TouchableOpacity onPress={handleResetSubjects} style={styles.reloadBtn} activeOpacity={0.8}>
-              <Ionicons name="refresh" size={13} color="#38BDF8" />
+              <Ionicons name="refresh" size={13} color="#C084FC" />
               <Text style={styles.reloadBtnText}>Reload 12</Text>
             </TouchableOpacity>
           </View>
@@ -198,115 +204,117 @@ export default function QueueScreen() {
                   },
                 ]}
               >
-                {/* Card Top Row: Rank, Title, Side Toggle (Doing/Done), Queue Buttons */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.titleGroup}>
-                    <View
+                {/* Row 1: Top Bar with Rank Pill on left, and Status Toggle + Actions on right */}
+                <View style={styles.cardTopRow}>
+                  <View
+                    style={[
+                      styles.rankPill,
+                      isActive && { backgroundColor: '#FFFFFF' },
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.rankPill,
-                        isActive && { backgroundColor: '#FFFFFF' },
+                        styles.rankPillText,
+                        isActive && { color: subj.color, fontWeight: '800' },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.rankPillText,
-                          isActive && { color: subj.color, fontWeight: '800' },
-                        ]}
-                      >
-                        {isActive ? '★ #1 ACTIVE' : `#${subj.queue_order}`}
-                      </Text>
-                    </View>
-                    <View style={styles.nameWrap}>
-                      <Text style={styles.subjectName}>{subj.name}</Text>
-                      <Text style={styles.subjectCode}>{subj.code}</Text>
-                    </View>
+                      {isActive ? '★ #1 ACTIVE' : `#${subj.queue_order}`}
+                    </Text>
                   </View>
 
-                  {/* SIDE TOGGLE: DOING vs DONE */}
-                  <View style={styles.statusToggleContainer}>
-                    <TouchableOpacity
-                      onPress={() => handleToggleStatus(subj.id, 'doing')}
-                      style={[
-                        styles.togglePill,
-                        (subj.status === 'doing' || (isActive && subj.status !== 'done'))
-                          ? styles.toggleDoingActive
-                          : styles.toggleInactive,
-                      ]}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={
-                          (subj.status === 'doing' || (isActive && subj.status !== 'done'))
-                            ? 'flash'
-                            : 'flash-outline'
-                        }
-                        size={11}
-                        color={
-                          (subj.status === 'doing' || (isActive && subj.status !== 'done'))
-                            ? '#FFFFFF'
-                            : '#94A3B8'
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.togglePillText,
-                          (subj.status === 'doing' || (isActive && subj.status !== 'done')) &&
-                            styles.togglePillTextActive,
-                        ]}
-                      >
-                        Doing
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => handleToggleStatus(subj.id, 'done')}
-                      style={[
-                        styles.togglePill,
-                        subj.status === 'done' ? styles.toggleDoneActive : styles.toggleInactive,
-                      ]}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={subj.status === 'done' ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                        size={11}
-                        color={subj.status === 'done' ? '#FFFFFF' : '#94A3B8'}
-                      />
-                      <Text
-                        style={[
-                          styles.togglePillText,
-                          subj.status === 'done' && styles.togglePillTextActive,
-                        ]}
-                      >
-                        Done
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Actions: Up, Down, Edit */}
-                  <View style={styles.actionGroup}>
-                    {!isFirst && (
+                  <View style={styles.cardTopRight}>
+                    {/* SIDE TOGGLE: DOING vs DONE */}
+                    <View style={styles.statusToggleContainer}>
                       <TouchableOpacity
-                        onPress={() => handleMove(subj.id, 'up')}
+                        onPress={() => handleToggleStatus(subj.id, 'doing')}
+                        style={[
+                          styles.togglePill,
+                          (subj.status === 'doing' || (isActive && subj.status !== 'done'))
+                            ? styles.toggleDoingActive
+                            : styles.toggleInactive,
+                        ]}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={
+                            (subj.status === 'doing' || (isActive && subj.status !== 'done'))
+                              ? 'flash'
+                              : 'flash-outline'
+                          }
+                          size={11}
+                          color={
+                            (subj.status === 'doing' || (isActive && subj.status !== 'done'))
+                              ? '#FFFFFF'
+                              : '#94A3B8'
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.togglePillText,
+                            (subj.status === 'doing' || (isActive && subj.status !== 'done')) &&
+                              styles.togglePillTextActive,
+                          ]}
+                        >
+                          Doing
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => handleToggleStatus(subj.id, 'done')}
+                        style={[
+                          styles.togglePill,
+                          subj.status === 'done' ? styles.toggleDoneActive : styles.toggleInactive,
+                        ]}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={subj.status === 'done' ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                          size={11}
+                          color={subj.status === 'done' ? '#FFFFFF' : '#94A3B8'}
+                        />
+                        <Text
+                          style={[
+                            styles.togglePillText,
+                            subj.status === 'done' && styles.togglePillTextActive,
+                          ]}
+                        >
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Actions: Up, Down, Edit */}
+                    <View style={styles.actionGroup}>
+                      {!isFirst && (
+                        <TouchableOpacity
+                          onPress={() => handleMove(subj.id, 'up')}
+                          style={styles.iconBtn}
+                        >
+                          <Ionicons name="arrow-up" size={13} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      )}
+                      {!isLast && (
+                        <TouchableOpacity
+                          onPress={() => handleMove(subj.id, 'down')}
+                          style={styles.iconBtn}
+                        >
+                          <Ionicons name="arrow-down" size={13} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => openEdit(subj)}
                         style={styles.iconBtn}
                       >
-                        <Ionicons name="arrow-up" size={14} color="#FFFFFF" />
+                        <Ionicons name="pencil" size={12} color="#FFFFFF" />
                       </TouchableOpacity>
-                    )}
-                    {!isLast && (
-                      <TouchableOpacity
-                        onPress={() => handleMove(subj.id, 'down')}
-                        style={styles.iconBtn}
-                      >
-                        <Ionicons name="arrow-down" size={14} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      onPress={() => openEdit(subj)}
-                      style={styles.iconBtn}
-                    >
-                      <Ionicons name="pencil" size={13} color="#FFFFFF" />
-                    </TouchableOpacity>
+                    </View>
                   </View>
+                </View>
+
+                {/* Row 2: Subject Title (Full width, bold, nicely spaced, never squished) */}
+                <View style={styles.subjectTitleSection}>
+                  <Text style={styles.subjectName}>{subj.name}</Text>
+                  <Text style={styles.subjectCode}>{subj.code}</Text>
                 </View>
 
                 {/* 3 Metric Rows: Lectures, DPP, PYQ */}
@@ -580,17 +588,16 @@ const styles = StyleSheet.create({
   cardWrapper: {
     marginBottom: 16,
   },
-  cardHeader: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 8,
   },
-  titleGroup: {
+  cardTopRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    gap: 6,
   },
   rankPill: {
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
@@ -598,24 +605,32 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
+  rankPillActive: {
+    backgroundColor: '#FFFFFF',
+  },
   rankPillText: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '800',
   },
-  nameWrap: {
-    flex: 1,
+  rankPillTextActive: {
+    fontWeight: '800',
+  },
+  subjectTitleSection: {
+    marginBottom: 12,
   },
   subjectName: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
+    lineHeight: 24,
   },
   subjectCode: {
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 11,
     fontWeight: '600',
+    marginTop: 2,
   },
   statusToggleContainer: {
     flexDirection: 'row',

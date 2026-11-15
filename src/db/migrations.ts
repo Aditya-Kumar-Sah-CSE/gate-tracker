@@ -61,65 +61,172 @@ export async function seedDefaultSubjects(db: SQLiteDatabase, force: boolean = f
   }
 }
 
-export async function ensureSubjectSchema(db: SQLiteDatabase): Promise<void> {
+export async function ensureAllSchemas(db: SQLiteDatabase): Promise<void> {
   try {
-    // 1. Check if subjects table exists
-    const tableCheck = await db.getFirstAsync<{ name: string }>(
+    // 1. Ensure subjects table and columns
+    const subjectsTable = await db.getFirstAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='subjects';"
     );
-    if (!tableCheck) {
+    if (!subjectsTable) {
       await db.execAsync(CREATE_TABLES_SQL);
       await seedDefaultSubjects(db, true);
-      return;
-    }
+    } else {
+      const subjectCols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(subjects);");
+      const subjectColNames = new Set(subjectCols.map((c) => c.name));
 
-    // 2. Read existing columns
-    const cols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(subjects);");
-    const colNames = new Set(cols.map((c) => c.name));
+      const neededSubjectCols: [string, string][] = [
+        ['queue_order', 'INTEGER DEFAULT 1'],
+        ['total_lectures', 'INTEGER DEFAULT 30'],
+        ['completed_lectures', 'INTEGER DEFAULT 0'],
+        ['is_lecture_count_estimated', 'INTEGER DEFAULT 1'],
+        ['total_dpps', 'INTEGER DEFAULT 0'],
+        ['completed_dpps', 'INTEGER DEFAULT 0'],
+        ['pyqs_attempted', 'INTEGER DEFAULT 0'],
+        ['pyqs_correct', 'INTEGER DEFAULT 0'],
+        ['pyqs_target', 'INTEGER DEFAULT 80'],
+        ['is_active', 'INTEGER DEFAULT 0'],
+        ['status', "TEXT DEFAULT 'in_queue'"],
+        ['gradient_start', "TEXT DEFAULT '#6366F1'"],
+        ['gradient_end', "TEXT DEFAULT '#8B5CF6'"],
+      ];
 
-    const neededColumns: [string, string][] = [
-      ['queue_order', 'INTEGER DEFAULT 1'],
-      ['total_lectures', 'INTEGER DEFAULT 30'],
-      ['completed_lectures', 'INTEGER DEFAULT 0'],
-      ['is_lecture_count_estimated', 'INTEGER DEFAULT 1'],
-      ['total_dpps', 'INTEGER DEFAULT 0'],
-      ['completed_dpps', 'INTEGER DEFAULT 0'],
-      ['pyqs_attempted', 'INTEGER DEFAULT 0'],
-      ['pyqs_correct', 'INTEGER DEFAULT 0'],
-      ['pyqs_target', 'INTEGER DEFAULT 80'],
-      ['is_active', 'INTEGER DEFAULT 0'],
-      ['status', "TEXT DEFAULT 'in_queue'"],
-      ['gradient_start', "TEXT DEFAULT '#6366F1'"],
-      ['gradient_end', "TEXT DEFAULT '#8B5CF6'"],
-    ];
-
-    for (const [colName, colDef] of neededColumns) {
-      if (!colNames.has(colName)) {
-        try {
-          await db.execAsync(`ALTER TABLE subjects ADD COLUMN ${colName} ${colDef};`);
-        } catch (err) {
-          console.warn(`Failed to add column ${colName} to subjects:`, err);
+      for (const [colName, colDef] of neededSubjectCols) {
+        if (!subjectColNames.has(colName)) {
+          try {
+            await db.execAsync(`ALTER TABLE subjects ADD COLUMN ${colName} ${colDef};`);
+          } catch (err) {
+            console.warn(`Failed to add column ${colName} to subjects:`, err);
+          }
         }
       }
     }
 
-    // Double check queue_order exists
-    const recheckCols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(subjects);");
-    const recheckNames = new Set(recheckCols.map((c) => c.name));
-    if (!recheckNames.has('queue_order')) {
-      // Recreate table cleanly with full schema to guarantee all columns
-      await db.withTransactionAsync(async () => {
-        try {
-          await db.execAsync("DROP TABLE IF EXISTS subjects;");
-        } catch {}
-        await db.execAsync(CREATE_TABLES_SQL);
-        await seedDefaultSubjects(db, true);
-      });
+    // 2. Ensure daily_goals table and columns
+    const goalsTable = await db.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='daily_goals';"
+    );
+    if (!goalsTable) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS daily_goals (
+          id TEXT PRIMARY KEY,
+          date TEXT NOT NULL UNIQUE,
+          target_study_minutes INTEGER NOT NULL DEFAULT 480,
+          target_lectures INTEGER NOT NULL DEFAULT 5,
+          target_dpps INTEGER NOT NULL DEFAULT 2,
+          target_pyqs INTEGER NOT NULL DEFAULT 20,
+          target_revision_minutes INTEGER NOT NULL DEFAULT 60,
+          focus_subject_id TEXT,
+          is_morning_set INTEGER NOT NULL DEFAULT 0,
+          morning_set_at TEXT,
+          created_at TEXT NOT NULL
+        );
+      `);
+    } else {
+      const goalCols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(daily_goals);");
+      const goalColNames = new Set(goalCols.map((c) => c.name));
+
+      const neededGoalCols: [string, string][] = [
+        ['focus_subject_id', 'TEXT DEFAULT NULL'],
+        ['is_morning_set', 'INTEGER DEFAULT 0'],
+        ['morning_set_at', 'TEXT DEFAULT NULL'],
+        ['target_study_minutes', 'INTEGER DEFAULT 480'],
+        ['target_lectures', 'INTEGER DEFAULT 5'],
+        ['target_dpps', 'INTEGER DEFAULT 2'],
+        ['target_pyqs', 'INTEGER DEFAULT 20'],
+        ['target_revision_minutes', 'INTEGER DEFAULT 60'],
+      ];
+
+      for (const [colName, colDef] of neededGoalCols) {
+        if (!goalColNames.has(colName)) {
+          try {
+            await db.execAsync(`ALTER TABLE daily_goals ADD COLUMN ${colName} ${colDef};`);
+          } catch (err) {
+            console.warn(`Failed to add column ${colName} to daily_goals:`, err);
+          }
+        }
+      }
+
+      // Re-verify focus_subject_id
+      const recheckGoalCols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(daily_goals);");
+      const recheckGoalColNames = new Set(recheckGoalCols.map((c) => c.name));
+      if (!recheckGoalColNames.has('focus_subject_id')) {
+        // Fallback: create table afresh if still missing
+        await db.withTransactionAsync(async () => {
+          try {
+            await db.execAsync("DROP TABLE IF EXISTS daily_goals;");
+          } catch {}
+          await db.execAsync(`
+            CREATE TABLE IF NOT EXISTS daily_goals (
+              id TEXT PRIMARY KEY,
+              date TEXT NOT NULL UNIQUE,
+              target_study_minutes INTEGER NOT NULL DEFAULT 480,
+              target_lectures INTEGER NOT NULL DEFAULT 5,
+              target_dpps INTEGER NOT NULL DEFAULT 2,
+              target_pyqs INTEGER NOT NULL DEFAULT 20,
+              target_revision_minutes INTEGER NOT NULL DEFAULT 60,
+              focus_subject_id TEXT,
+              is_morning_set INTEGER NOT NULL DEFAULT 0,
+              morning_set_at TEXT,
+              created_at TEXT NOT NULL
+            );
+          `);
+        });
+      }
+    }
+
+    // 3. Ensure daily_progress table and columns
+    const progressTable = await db.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='daily_progress';"
+    );
+    if (!progressTable) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS daily_progress (
+          id TEXT PRIMARY KEY,
+          date TEXT NOT NULL UNIQUE,
+          total_study_seconds INTEGER NOT NULL DEFAULT 0,
+          lectures_completed INTEGER NOT NULL DEFAULT 0,
+          dpps_completed INTEGER NOT NULL DEFAULT 0,
+          pyqs_attempted INTEGER NOT NULL DEFAULT 0,
+          pyqs_correct INTEGER NOT NULL DEFAULT 0,
+          night_review_done INTEGER NOT NULL DEFAULT 0,
+          night_review_at TEXT,
+          reflection_notes TEXT,
+          target_achieved_pct REAL NOT NULL DEFAULT 0.0,
+          created_at TEXT NOT NULL
+        );
+      `);
+    } else {
+      const progCols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(daily_progress);");
+      const progColNames = new Set(progCols.map((c) => c.name));
+
+      const neededProgCols: [string, string][] = [
+        ['total_study_seconds', 'INTEGER DEFAULT 0'],
+        ['lectures_completed', 'INTEGER DEFAULT 0'],
+        ['dpps_completed', 'INTEGER DEFAULT 0'],
+        ['pyqs_attempted', 'INTEGER DEFAULT 0'],
+        ['pyqs_correct', 'INTEGER DEFAULT 0'],
+        ['night_review_done', 'INTEGER DEFAULT 0'],
+        ['night_review_at', 'TEXT DEFAULT NULL'],
+        ['reflection_notes', 'TEXT DEFAULT NULL'],
+        ['target_achieved_pct', 'REAL DEFAULT 0.0'],
+      ];
+
+      for (const [colName, colDef] of neededProgCols) {
+        if (!progColNames.has(colName)) {
+          try {
+            await db.execAsync(`ALTER TABLE daily_progress ADD COLUMN ${colName} ${colDef};`);
+          } catch (err) {
+            console.warn(`Failed to add column ${colName} to daily_progress:`, err);
+          }
+        }
+      }
     }
   } catch (err) {
-    console.error('ensureSubjectSchema error:', err);
+    console.error('ensureAllSchemas error:', err);
   }
 }
+
+export const ensureSubjectSchema = ensureAllSchemas;
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   // First guarantee subject schema integrity

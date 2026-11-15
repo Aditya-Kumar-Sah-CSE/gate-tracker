@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -94,8 +96,12 @@ export default function PlannerScreen() {
   const totalWeeklyPyq = weeklyActivity.reduce((acc, d) => acc + d.pyqs, 0);
   const totalWeeklyHours = Math.round(weeklyActivity.reduce((acc, d) => acc + d.studyHours, 0) * 10) / 10;
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16) + 8;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: topInset }]}>
+      <StatusBar barStyle="light-content" />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}

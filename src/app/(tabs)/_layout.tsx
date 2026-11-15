@@ -1,29 +1,33 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../../stores/appStore';
+import { Colors } from '../../constants/theme';
 
 export default function TabLayout() {
   const { theme } = useAppStore();
   const isLight = theme === 'light';
+  const insets = useSafeAreaInsets();
+  const themeColors = Colors[isLight ? 'light' : 'dark'];
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#38BDF8',
-        tabBarInactiveTintColor: isLight ? '#94A3B8' : '#64748B',
+        tabBarActiveTintColor: isLight ? '#7C3AED' : '#C084FC',
+        tabBarInactiveTintColor: isLight ? '#94A3B8' : '#818CF8',
         tabBarStyle: {
-          backgroundColor: isLight ? '#FFFFFF' : '#0D1017',
-          borderTopColor: isLight ? '#E2E8F0' : '#1A212E',
+          backgroundColor: themeColors.navBg,
+          borderTopColor: themeColors.tabBarBorder,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 62 + (insets.bottom > 0 ? insets.bottom - 6 : 0),
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
         },
       }}
     >

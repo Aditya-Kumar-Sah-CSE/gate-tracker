@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.0</Text>
-                  <Text style={styles.headerSubtitle}>{"Gamified Radial Journey & Fixes Active!"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.1</Text>
+                  <Text style={styles.headerSubtitle}>{"Notch Margin, UI Consistency & Schema Fixes"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>

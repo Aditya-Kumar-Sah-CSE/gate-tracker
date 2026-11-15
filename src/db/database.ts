@@ -345,24 +345,47 @@ export async function getTodayGoals(): Promise<DailyGoal> {
     const activeSubj = await getActiveSubject();
     const now = new Date().toISOString();
 
-    await db.runAsync(
-      `INSERT OR IGNORE INTO daily_goals (
-        id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
-        target_revision_minutes, focus_subject_id, is_morning_set, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [
-        'goal_' + today,
-        today,
-        Math.round(settings.daily_study_hours_target * 60),
-        settings.daily_lecture_target,
-        settings.daily_dpp_target,
-        settings.daily_pyq_target,
-        settings.daily_revision_minutes_target,
-        activeSubj?.id ?? 'cs_cp',
-        0,
-        now,
-      ]
-    );
+    try {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO daily_goals (
+          id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
+          target_revision_minutes, focus_subject_id, is_morning_set, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          'goal_' + today,
+          today,
+          Math.round(settings.daily_study_hours_target * 60),
+          settings.daily_lecture_target,
+          settings.daily_dpp_target,
+          settings.daily_pyq_target,
+          settings.daily_revision_minutes_target,
+          activeSubj?.id ?? 'cs_cp',
+          0,
+          now,
+        ]
+      );
+    } catch {
+      await ensureSubjectSchema(db);
+      try {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO daily_goals (
+            id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
+            target_revision_minutes, is_morning_set, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          [
+            'goal_' + today,
+            today,
+            Math.round(settings.daily_study_hours_target * 60),
+            settings.daily_lecture_target,
+            settings.daily_dpp_target,
+            settings.daily_pyq_target,
+            settings.daily_revision_minutes_target,
+            0,
+            now,
+          ]
+        );
+      } catch {}
+    }
 
     goal = await db.getFirstAsync<DailyGoal>('SELECT * FROM daily_goals WHERE date = ?;', [today]);
   }
@@ -393,33 +416,94 @@ export async function saveMorningGoals(goals: {
     targetSubjectId = existingSubjects[0]?.id || 'cs_cp';
   }
 
-  await db.runAsync(
-    `INSERT INTO daily_goals (
-      id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
-      target_revision_minutes, focus_subject_id, is_morning_set, morning_set_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(date) DO UPDATE SET
-      target_study_minutes = excluded.target_study_minutes,
-      target_lectures = excluded.target_lectures,
-      target_dpps = excluded.target_dpps,
-      target_pyqs = excluded.target_pyqs,
-      focus_subject_id = excluded.focus_subject_id,
-      is_morning_set = 1,
-      morning_set_at = excluded.morning_set_at;`,
-    [
-      'goal_' + today,
-      today,
-      goals.target_study_minutes,
-      goals.target_lectures,
-      goals.target_dpps,
-      goals.target_pyqs,
-      60,
-      targetSubjectId,
-      1,
-      now,
-      now,
-    ]
-  );
+  try {
+    await db.runAsync(
+      `INSERT INTO daily_goals (
+        id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
+        target_revision_minutes, focus_subject_id, is_morning_set, morning_set_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(date) DO UPDATE SET
+        target_study_minutes = excluded.target_study_minutes,
+        target_lectures = excluded.target_lectures,
+        target_dpps = excluded.target_dpps,
+        target_pyqs = excluded.target_pyqs,
+        focus_subject_id = excluded.focus_subject_id,
+        is_morning_set = 1,
+        morning_set_at = excluded.morning_set_at;`,
+      [
+        'goal_' + today,
+        today,
+        goals.target_study_minutes,
+        goals.target_lectures,
+        goals.target_dpps,
+        goals.target_pyqs,
+        60,
+        targetSubjectId,
+        1,
+        now,
+        now,
+      ]
+    );
+  } catch (err) {
+    console.warn('saveMorningGoals failed, running schema auto-heal and retrying:', err);
+    await ensureSubjectSchema(db);
+    try {
+      await db.runAsync(
+        `INSERT INTO daily_goals (
+          id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
+          target_revision_minutes, focus_subject_id, is_morning_set, morning_set_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+          target_study_minutes = excluded.target_study_minutes,
+          target_lectures = excluded.target_lectures,
+          target_dpps = excluded.target_dpps,
+          target_pyqs = excluded.target_pyqs,
+          focus_subject_id = excluded.focus_subject_id,
+          is_morning_set = 1,
+          morning_set_at = excluded.morning_set_at;`,
+        [
+          'goal_' + today,
+          today,
+          goals.target_study_minutes,
+          goals.target_lectures,
+          goals.target_dpps,
+          goals.target_pyqs,
+          60,
+          targetSubjectId,
+          1,
+          now,
+          now,
+        ]
+      );
+    } catch {
+      // Last-ditch fallback: update without focus_subject_id if column failed
+      await db.runAsync(
+        `INSERT INTO daily_goals (
+          id, date, target_study_minutes, target_lectures, target_dpps, target_pyqs,
+          target_revision_minutes, is_morning_set, morning_set_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+          target_study_minutes = excluded.target_study_minutes,
+          target_lectures = excluded.target_lectures,
+          target_dpps = excluded.target_dpps,
+          target_pyqs = excluded.target_pyqs,
+          is_morning_set = 1,
+          morning_set_at = excluded.morning_set_at;`,
+        [
+          'goal_' + today,
+          today,
+          goals.target_study_minutes,
+          goals.target_lectures,
+          goals.target_dpps,
+          goals.target_pyqs,
+          60,
+          1,
+          now,
+          now,
+        ]
+      );
+    }
+  }
 
   if (targetSubjectId) {
     await setSubjectActive(targetSubjectId);

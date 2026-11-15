@@ -9,8 +9,10 @@ import {
   Modal,
   TextInput,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../stores/appStore';
@@ -103,8 +105,12 @@ export default function PyqScreen() {
   const totalCorrect = subjects.reduce((acc, s) => acc + s.pyqs_correct, 0);
   const overallAcc = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : 0;
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16) + 8;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: topInset }]}>
+      <StatusBar barStyle="light-content" />
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
