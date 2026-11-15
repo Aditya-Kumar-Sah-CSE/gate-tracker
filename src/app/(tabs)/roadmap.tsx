@@ -43,7 +43,7 @@ export default function QueueScreen() {
   const loadData = useCallback(async () => {
     try {
       let list = await getSubjectsInQueue();
-      if (!list || list.length === 0) {
+      if (!list || list.length < 12) {
         list = await resetAllSubjectsToDefault();
       }
       setSubjects(list);

@@ -23,6 +23,7 @@ import {
   getOverallStats,
   updateSubjectProgress,
   toggleSubjectStatus,
+  updateTodayProgressItem,
 } from '../../db/database';
 import { Subject, DailyGoal, DailyProgress, DayActivity } from '../../types';
 import { Colors, Gradients } from '../../constants/theme';
@@ -33,6 +34,7 @@ import { NightReviewModal } from '../../components/NightReviewModal';
 import { VersionUpdateModal } from '../../components/VersionUpdateModal';
 
 let hasAutoShownVersion = false;
+let hasAutoOpenedNightReviewToday = false;
 
 export default function DashboardScreen() {
   const { settings, dataVersion, triggerRefresh, startTimer } = useAppStore();
@@ -132,6 +134,44 @@ export default function DashboardScreen() {
     triggerRefresh();
   };
 
+  const handleProgressDelta = async (
+    type: 'lecture' | 'dpp' | 'pyq' | 'hours',
+    delta: number
+  ) => {
+    triggerHaptic();
+    try {
+      const res = await updateTodayProgressItem(type, delta, activeSubject?.id);
+      setTodayProgress(res.progress);
+      if (res.subject) {
+        setActiveSubject(res.subject);
+      }
+      await loadDashboardData();
+      triggerRefresh();
+    } catch (err) {
+      console.error('Error updating progress item:', err);
+    }
+  };
+
+  // 9:00 PM Auto Pop-Up Check
+  useEffect(() => {
+    const check9PMReview = () => {
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour >= 21 && todayProgress && todayProgress.night_review_done !== 1) {
+        if (!hasAutoOpenedNightReviewToday) {
+          hasAutoOpenedNightReviewToday = true;
+          setTimeout(() => {
+            setNightModalVisible(true);
+          }, 900);
+        }
+      }
+    };
+
+    check9PMReview();
+    const interval = setInterval(check9PMReview, 20000);
+    return () => clearInterval(interval);
+  }, [todayProgress]);
+
   const handleToggleActiveStatus = async (newStatus: 'doing' | 'done') => {
     if (!activeSubject) return;
     triggerHaptic();
@@ -186,7 +226,7 @@ export default function DashboardScreen() {
                 style={styles.versionBadge}
                 activeOpacity={0.8}
               >
-                <Text style={styles.versionBadgeText}>v1.1.0 🚀</Text>
+                <Text style={styles.versionBadgeText}>v1.2.0 🚀</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
@@ -277,6 +317,44 @@ export default function DashboardScreen() {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        {/* 9:00 PM Night Review Alert Banner */}
+        {isPast9PM && todayProgress?.night_review_done !== 1 && (
+          <TouchableOpacity
+            onPress={() => setNightModalVisible(true)}
+            style={styles.nightPromptBanner}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#7C3AED', '#DB2777']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.nightPromptGradient}
+            >
+              <View style={styles.nightPromptLeft}>
+                <Text style={styles.nightPromptIcon}>🌙</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nightPromptTitle}>9:00 PM Night Check-In Active!</Text>
+                  <Text style={styles.nightPromptSub}>
+                    {"Tap to confirm today's achieved targets & save streak 🔥"}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.nightPromptBtn}>
+                <Text style={styles.nightPromptBtnText}>Confirm ➔</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
+        {todayProgress?.night_review_done === 1 && (
+          <View style={styles.nightConfirmedBanner}>
+            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+            <Text style={styles.nightConfirmedText}>
+              9:00 PM Target Confirmed • Day {prepDay.day} Streak Saved! 🔥
+            </Text>
+          </View>
+        )}
 
         {/* FEATURED: Real 3D Active Subject Card */}
         {activeSubject && (
@@ -394,16 +472,57 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Today's Target vs Achieved Progress Ring Card */}
+        {/* Today's Target vs Achieved Interactive Command Center */}
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionHeader}>{"TODAY'S TARGET VS ACHIEVED"}</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionHeader}>{"TODAY'S TARGET & LIVE COUNTERS"}</Text>
+              <View
+                style={[
+                  styles.targetLockPill,
+                  todayGoal?.is_morning_set === 1 ? styles.targetLockedBg : styles.targetUnlockedBg,
+                ]}
+              >
+                <Ionicons
+                  name={todayGoal?.is_morning_set === 1 ? 'lock-closed' : 'alert-circle'}
+                  size={10}
+                  color={todayGoal?.is_morning_set === 1 ? '#10B981' : '#F59E0B'}
+                />
+                <Text
+                  style={[
+                    styles.targetLockPillText,
+                    { color: todayGoal?.is_morning_set === 1 ? '#10B981' : '#F59E0B' },
+                  ]}
+                >
+                  {todayGoal?.is_morning_set === 1 ? 'LOCKED' : 'NOT SET'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setMorningModalVisible(true)} activeOpacity={0.8}>
+              <Text style={styles.viewQueueLink}>
+                {todayGoal?.is_morning_set === 1 ? 'Edit Target ✏️' : 'Lock Target 🌅'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Locked Subject Tag Banner if active */}
+          {activeSubject && (
+            <View style={[styles.targetSubjectBanner, { borderColor: activeSubject.color }]}>
+              <Ionicons name="sparkles" size={14} color="#FFD700" />
+              <Text style={styles.targetSubjectBannerText}>
+                Focus Subject: <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{activeSubject.name} ({activeSubject.code})</Text>
+              </Text>
+            </View>
+          )}
+
+          {/* 3D Target Command Center Card */}
           <Card3D gradient={Gradients.cardGlassDark as any} style={styles.targetStatusCard}>
+            {/* Top Ring + Overview */}
             <View style={styles.targetStatusRow}>
-              {/* Circular Progress Ring */}
               <View style={styles.ringCol}>
                 <CircularProgress
-                  size={100}
-                  strokeWidth={10}
+                  size={92}
+                  strokeWidth={9}
                   percentage={totalScore}
                   color="#8B5CF6"
                   centerText={`${totalScore}%`}
@@ -411,38 +530,185 @@ export default function DashboardScreen() {
                 />
               </View>
 
-              {/* Progress Breakdown */}
               <View style={styles.statsBreakdown}>
-                <View style={styles.statRow}>
-                  <View style={[styles.statDot, { backgroundColor: '#8B5CF6' }]} />
-                  <Text style={styles.statLabel}>PW Lectures:</Text>
-                  <Text style={styles.statNumbers}>
-                    {completedLectures}/{targetLectures}
-                  </Text>
+                <Text style={styles.targetOverviewTitle}>
+                  {totalScore >= 100 ? '🎉 All Targets Met!' : `${totalScore}% Achieved Today`}
+                </Text>
+                <Text style={styles.targetOverviewSub}>
+                  {completedLectures}/{targetLectures} Lec • {completedDpps}/{targetDpps} DPP • {completedPyqs}/{targetPyqs} PYQ • {studyHours}h/{targetHours}h
+                </Text>
+                <View style={styles.targetStreakRow}>
+                  <Ionicons name="flame" size={14} color="#F59E0B" />
+                  <Text style={styles.targetStreakText}>Day {prepDay.day} Streak Active</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 4 Clickable Interactive Action Counter Rows */}
+            <View style={styles.counterCardsGrid}>
+              {/* 1. PW Lectures Counter Row */}
+              <View style={styles.interactiveCounterRow}>
+                <View style={styles.counterLeftCol}>
+                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.25)' }]}>
+                    <Ionicons name="play-circle" size={18} color="#A78BFA" />
+                  </View>
+                  <View>
+                    <Text style={styles.counterRowLabel}>PW Lectures</Text>
+                    <Text style={styles.counterRowSub}>
+                      {completedLectures} of {targetLectures} Seen
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.statRow}>
-                  <View style={[styles.statDot, { backgroundColor: '#06B6D4' }]} />
-                  <Text style={styles.statLabel}>DPP Sheets:</Text>
-                  <Text style={styles.statNumbers}>
-                    {completedDpps}/{targetDpps}
-                  </Text>
+                <View style={styles.counterControlsWrap}>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('lecture', -1)}
+                    style={styles.counterAdjustBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="remove" size={16} color="#A78BFA" />
+                  </TouchableOpacity>
+                  <View style={styles.counterDisplayBox}>
+                    <Text style={[styles.counterDisplayVal, { color: '#A78BFA' }]}>
+                      {completedLectures}
+                      <Text style={styles.counterDisplayTarget}>/{targetLectures}</Text>
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('lecture', 1)}
+                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(139, 92, 246, 0.35)' }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 2. DPP Sheets Counter Row */}
+              <View style={styles.interactiveCounterRow}>
+                <View style={styles.counterLeftCol}>
+                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(6, 182, 212, 0.25)' }]}>
+                    <Ionicons name="document-text" size={18} color="#38BDF8" />
+                  </View>
+                  <View>
+                    <Text style={styles.counterRowLabel}>DPP Sheets</Text>
+                    <Text style={styles.counterRowSub}>
+                      {completedDpps} of {targetDpps} Solved
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.statRow}>
-                  <View style={[styles.statDot, { backgroundColor: '#10B981' }]} />
-                  <Text style={styles.statLabel}>GATE PYQs:</Text>
-                  <Text style={styles.statNumbers}>
-                    {completedPyqs}/{targetPyqs}
-                  </Text>
+                <View style={styles.counterControlsWrap}>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('dpp', -1)}
+                    style={styles.counterAdjustBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="remove" size={16} color="#38BDF8" />
+                  </TouchableOpacity>
+                  <View style={styles.counterDisplayBox}>
+                    <Text style={[styles.counterDisplayVal, { color: '#38BDF8' }]}>
+                      {completedDpps}
+                      <Text style={styles.counterDisplayTarget}>/{targetDpps}</Text>
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('dpp', 1)}
+                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)' }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 3. GATE PYQs Counter Row */}
+              <View style={styles.interactiveCounterRow}>
+                <View style={styles.counterLeftCol}>
+                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(16, 185, 129, 0.25)' }]}>
+                    <Ionicons name="checkmark-done-circle" size={18} color="#34D399" />
+                  </View>
+                  <View>
+                    <Text style={styles.counterRowLabel}>GATE PYQs</Text>
+                    <Text style={styles.counterRowSub}>
+                      {completedPyqs} of {targetPyqs} Done
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.statRow}>
-                  <View style={[styles.statDot, { backgroundColor: '#F59E0B' }]} />
-                  <Text style={styles.statLabel}>Study Hours:</Text>
-                  <Text style={styles.statNumbers}>
-                    {studyHours}h/{targetHours}h
-                  </Text>
+                <View style={styles.counterControlsWrap}>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('pyq', -1)}
+                    style={styles.counterAdjustBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="remove" size={16} color="#34D399" />
+                  </TouchableOpacity>
+                  <View style={styles.counterDisplayBox}>
+                    <Text style={[styles.counterDisplayVal, { color: '#34D399' }]}>
+                      {completedPyqs}
+                      <Text style={styles.counterDisplayTarget}>/{targetPyqs}</Text>
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('pyq', 1)}
+                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)' }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('pyq', 5)}
+                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(16, 185, 129, 0.45)', width: 38 }]}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>+5</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 4. Study Hours Counter Row */}
+              <View style={styles.interactiveCounterRow}>
+                <View style={styles.counterLeftCol}>
+                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(245, 158, 11, 0.25)' }]}>
+                    <Ionicons name="time" size={18} color="#FBBF24" />
+                  </View>
+                  <View>
+                    <Text style={styles.counterRowLabel}>Study Hours</Text>
+                    <Text style={styles.counterRowSub}>
+                      {studyHours}h of {targetHours}h Logged
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.counterControlsWrap}>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('hours', -0.5)}
+                    style={styles.counterAdjustBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="remove" size={16} color="#FBBF24" />
+                  </TouchableOpacity>
+                  <View style={styles.counterDisplayBox}>
+                    <Text style={[styles.counterDisplayVal, { color: '#FBBF24' }]}>
+                      {studyHours}h
+                      <Text style={styles.counterDisplayTarget}>/{targetHours}h</Text>
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleProgressDelta('hours', 0.5)}
+                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)' }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => startTimer(activeSubject?.id || 'cs_cp', 'lecture')}
+                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(245, 158, 11, 0.45)', width: 42 }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -944,5 +1210,198 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 11,
     fontWeight: '500',
+  },
+  // 9:00 PM Check-In Banners
+  nightPromptBanner: {
+    marginVertical: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(236, 72, 153, 0.4)',
+  },
+  nightPromptGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  nightPromptLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  nightPromptIcon: {
+    fontSize: 22,
+  },
+  nightPromptTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  nightPromptSub: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  nightPromptBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  nightPromptBtnText: {
+    color: '#7C3AED',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  nightConfirmedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginVertical: 8,
+  },
+  nightConfirmedText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  // Today's Target Lock Pill & Focus Banner
+  targetLockPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  targetLockedBg: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  targetUnlockedBg: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  targetLockPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  targetSubjectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderLeftWidth: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  targetSubjectBannerText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  targetOverviewTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  targetOverviewSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  targetStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  targetStreakText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  // Interactive Live Counter Rows
+  counterCardsGrid: {
+    marginTop: 14,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingTop: 12,
+  },
+  interactiveCounterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  counterLeftCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  counterIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterRowLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  counterRowSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  counterControlsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  counterAdjustBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterDisplayBox: {
+    minWidth: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  counterDisplayVal: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  counterDisplayTarget: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
   },
 });

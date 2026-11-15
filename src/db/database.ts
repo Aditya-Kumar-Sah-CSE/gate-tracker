@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { runMigrations, seedDefaultSubjects } from './migrations';
+import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 import {
   AppSettings,
   Subject,
@@ -11,6 +12,14 @@ import {
   DifficultyLevel,
   DatabaseBackup,
 } from '../types';
+
+export function getTodayDateString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
@@ -100,7 +109,7 @@ export async function getSubjectsInQueue(): Promise<Subject[]> {
   let subjects = await db.getAllAsync<Subject>(
     'SELECT * FROM subjects ORDER BY queue_order ASC, name ASC;'
   );
-  if (!subjects || subjects.length === 0) {
+  if (!subjects || subjects.length < DEFAULT_GATE_SUBJECTS.length) {
     await seedDefaultSubjects(db, true);
     subjects = await db.getAllAsync<Subject>(
       'SELECT * FROM subjects ORDER BY queue_order ASC, name ASC;'
@@ -319,7 +328,7 @@ export async function updateSubjectDetails(
 // ----------------------------------------------------
 export async function getTodayGoals(): Promise<DailyGoal> {
   const db = await getDatabase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateString();
   let goal = await db.getFirstAsync<DailyGoal>('SELECT * FROM daily_goals WHERE date = ?;', [today]);
 
   if (!goal) {
@@ -360,8 +369,20 @@ export async function saveMorningGoals(goals: {
   focus_subject_id?: string;
 }): Promise<DailyGoal> {
   const db = await getDatabase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateString();
   const now = new Date().toISOString();
+
+  // Validate or fallback focus_subject_id to prevent FK errors
+  let targetSubjectId = goals.focus_subject_id;
+  const existingSubjects = await getSubjectsInQueue();
+  if (targetSubjectId) {
+    const exists = existingSubjects.some((s) => s.id === targetSubjectId);
+    if (!exists) {
+      targetSubjectId = existingSubjects[0]?.id || 'cs_cp';
+    }
+  } else {
+    targetSubjectId = existingSubjects[0]?.id || 'cs_cp';
+  }
 
   await db.runAsync(
     `INSERT INTO daily_goals (
@@ -384,15 +405,15 @@ export async function saveMorningGoals(goals: {
       goals.target_dpps,
       goals.target_pyqs,
       60,
-      goals.focus_subject_id ?? null,
+      targetSubjectId,
       1,
       now,
       now,
     ]
   );
 
-  if (goals.focus_subject_id) {
-    await setSubjectActive(goals.focus_subject_id);
+  if (targetSubjectId) {
+    await setSubjectActive(targetSubjectId);
   }
 
   return getTodayGoals();
@@ -403,7 +424,7 @@ export async function saveMorningGoals(goals: {
 // ----------------------------------------------------
 export async function getTodayProgress(): Promise<DailyProgress> {
   const db = await getDatabase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateString();
   let progress = await db.getFirstAsync<DailyProgress>(
     'SELECT * FROM daily_progress WHERE date = ?;',
     [today]
@@ -428,6 +449,99 @@ export async function getTodayProgress(): Promise<DailyProgress> {
   return progress!;
 }
 
+export async function updateTodayProgressItem(
+  item: 'lecture' | 'dpp' | 'pyq' | 'hours',
+  delta: number,
+  subjectId?: string
+): Promise<{ progress: DailyProgress; subject: Subject | null }> {
+  const db = await getDatabase();
+  const today = getTodayDateString();
+
+  await getTodayProgress();
+
+  let targetSubjectId = subjectId;
+  if (!targetSubjectId) {
+    const active = await getActiveSubject();
+    targetSubjectId = active?.id;
+  }
+
+  let updatedProg: DailyProgress | null = null;
+  let updatedSubj: Subject | null = null;
+
+  await db.withTransactionAsync(async () => {
+    const prog = await getTodayProgress();
+    let newLec = prog.lectures_completed;
+    let newDpp = prog.dpps_completed;
+    let newPyq = prog.pyqs_attempted;
+    let newCorrect = prog.pyqs_correct;
+    let newSec = prog.total_study_seconds;
+
+    if (item === 'lecture') {
+      newLec = Math.max(0, prog.lectures_completed + delta);
+    } else if (item === 'dpp') {
+      newDpp = Math.max(0, prog.dpps_completed + delta);
+    } else if (item === 'pyq') {
+      newPyq = Math.max(0, prog.pyqs_attempted + delta);
+      newCorrect = Math.max(0, prog.pyqs_correct + delta);
+    } else if (item === 'hours') {
+      newSec = Math.max(0, prog.total_study_seconds + Math.round(delta * 3600));
+    }
+
+    const goals = await getTodayGoals();
+    const lPct = goals.target_lectures > 0 ? (newLec / goals.target_lectures) * 100 : 0;
+    const dPct = goals.target_dpps > 0 ? (newDpp / goals.target_dpps) * 100 : 0;
+    const pPct = goals.target_pyqs > 0 ? (newPyq / goals.target_pyqs) * 100 : 0;
+    const totalAchievedPct = Math.min(100, Math.round((lPct + dPct + pPct) / 3));
+
+    await db.runAsync(
+      `UPDATE daily_progress SET
+        total_study_seconds = ?,
+        lectures_completed = ?,
+        dpps_completed = ?,
+        pyqs_attempted = ?,
+        pyqs_correct = ?,
+        target_achieved_pct = ?
+      WHERE date = ?;`,
+      [newSec, newLec, newDpp, newPyq, newCorrect, totalAchievedPct, today]
+    );
+
+    if (targetSubjectId && (item === 'lecture' || item === 'dpp' || item === 'pyq')) {
+      const subj = await db.getFirstAsync<Subject>('SELECT * FROM subjects WHERE id = ?;', [targetSubjectId]);
+      if (subj) {
+        let sLec = subj.completed_lectures;
+        let sDpp = subj.completed_dpps;
+        let sPyq = subj.pyqs_attempted;
+        let sCorr = subj.pyqs_correct;
+
+        if (item === 'lecture') sLec = Math.max(0, subj.completed_lectures + delta);
+        if (item === 'dpp') sDpp = Math.max(0, subj.completed_dpps + delta);
+        if (item === 'pyq') {
+          sPyq = Math.max(0, subj.pyqs_attempted + delta);
+          sCorr = Math.max(0, subj.pyqs_correct + delta);
+        }
+
+        const status = sLec >= subj.total_lectures && subj.total_lectures > 0 ? 'completed' : subj.status;
+
+        await db.runAsync(
+          `UPDATE subjects SET
+            completed_lectures = ?,
+            completed_dpps = ?,
+            pyqs_attempted = ?,
+            pyqs_correct = ?,
+            status = ?
+          WHERE id = ?;`,
+          [sLec, sDpp, sPyq, sCorr, status, targetSubjectId]
+        );
+        updatedSubj = await db.getFirstAsync<Subject>('SELECT * FROM subjects WHERE id = ?;', [targetSubjectId]);
+      }
+    }
+
+    updatedProg = await db.getFirstAsync<DailyProgress>('SELECT * FROM daily_progress WHERE date = ?;', [today]);
+  });
+
+  return { progress: updatedProg!, subject: updatedSubj };
+}
+
 export async function saveNightReview(review: {
   lectures_completed: number;
   dpps_completed: number;
@@ -438,7 +552,7 @@ export async function saveNightReview(review: {
   subject_id?: string;
 }): Promise<DailyProgress> {
   const db = await getDatabase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateString();
   const now = new Date().toISOString();
 
   const totalStudySeconds = Math.round(review.study_hours * 3600);

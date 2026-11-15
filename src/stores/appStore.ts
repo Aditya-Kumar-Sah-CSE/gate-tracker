@@ -64,6 +64,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         theme: settings.theme_preference || 'dark',
         isLoading: false
       });
+      // Ensure morning 7 AM & night 9 PM reminders are active
+      scheduleAppNotifications(settings).catch(() => {});
       return settings;
     } catch (e) {
       set({ isLoading: false });

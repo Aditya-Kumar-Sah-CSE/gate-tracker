@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,6 +37,7 @@ export function MorningTargetModal({
   const [targetDpps, setTargetDpps] = useState<number>(2);
   const [targetPyqs, setTargetPyqs] = useState<number>(20);
   const [targetHours, setTargetHours] = useState<number>(8);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -69,6 +71,8 @@ export function MorningTargetModal({
   }, [visible, currentGoal]);
 
   const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -82,8 +86,15 @@ export function MorningTargetModal({
       });
       onSaved(goal);
       onClose();
-    } catch (e) {
-      console.error(e);
+      Alert.alert(
+        '🎯 Target Locked!',
+        `Today's Focus: ${selectedSubj?.name || 'Selected'}\n• ${targetLectures} Lectures\n• ${targetDpps} DPP Sheets\n• ${targetPyqs} PYQs\n• ${targetHours} Hours Study Time\n\nDaily streak is active! 🚀`
+      );
+    } catch (e: any) {
+      console.error('Target lock error:', e);
+      Alert.alert('Lock Failed', e?.message || 'Could not lock target. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -339,7 +350,12 @@ export function MorningTargetModal({
             </View>
 
             {/* Submit Button */}
-            <TouchableOpacity onPress={handleSave} style={styles.saveBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              onPress={handleSave}
+              style={[styles.saveBtn, isSaving && { opacity: 0.65 }]}
+              activeOpacity={0.85}
+              disabled={isSaving}
+            >
               <LinearGradient
                 colors={Gradients.sunsetBlaze as any}
                 start={{ x: 0, y: 0 }}
@@ -347,7 +363,9 @@ export function MorningTargetModal({
                 style={styles.saveBtnGradient}
               >
                 <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.saveBtnText}>{"LOCK TODAY'S TARGET 🚀"}</Text>
+                <Text style={styles.saveBtnText}>
+                  {isSaving ? 'LOCKING TARGET...' : "LOCK TODAY'S TARGET 🚀"}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 

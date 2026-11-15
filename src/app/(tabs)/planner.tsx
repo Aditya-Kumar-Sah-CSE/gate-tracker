@@ -17,8 +17,8 @@ import {
   getTodayGoals,
   getTodayProgress,
   getWeeklyActivity,
-  updateSubjectProgress,
   getActiveSubject,
+  updateTodayProgressItem,
 } from '../../db/database';
 import { Subject, DailyGoal, DailyProgress, DayActivity } from '../../types';
 import { Colors, Gradients } from '../../constants/theme';
@@ -70,20 +70,22 @@ export default function PlannerScreen() {
     }
   };
 
-  const handleQuickAdd = async (type: 'lecture' | 'dpp' | 'pyq') => {
+  const handleProgressDelta = async (
+    type: 'lecture' | 'dpp' | 'pyq' | 'hours',
+    delta: number
+  ) => {
     triggerHaptic();
-    if (!activeSubject) return;
-
-    if (type === 'lecture') {
-      await updateSubjectProgress(activeSubject.id, { completed_lectures: 1 });
-    } else if (type === 'dpp') {
-      await updateSubjectProgress(activeSubject.id, { completed_dpps: 1 });
-    } else {
-      await updateSubjectProgress(activeSubject.id, { pyqs_attempted: 1, pyqs_correct: 1 });
+    try {
+      const res = await updateTodayProgressItem(type, delta, activeSubject?.id);
+      setTodayProgress(res.progress);
+      if (res.subject) {
+        setActiveSubject(res.subject);
+      }
+      await loadData();
+      triggerRefresh();
+    } catch (err) {
+      console.error('Planner progress update error:', err);
     }
-
-    await loadData();
-    triggerRefresh();
   };
 
   // Weekly aggregates
@@ -199,13 +201,23 @@ export default function PlannerScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              onPress={() => handleQuickAdd('lecture')}
-              style={styles.quickAddBtn}
-            >
-              <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.quickAddText}>+1 Done</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('lecture', -1)}
+                style={[styles.quickAddBtn, { paddingHorizontal: 10 }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="remove" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('lecture', 1)}
+                style={styles.quickAddBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.quickAddText}>+1</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Card3D>
 
@@ -223,13 +235,23 @@ export default function PlannerScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              onPress={() => handleQuickAdd('dpp')}
-              style={[styles.quickAddBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)' }]}
-            >
-              <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.quickAddText}>+1 Done</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('dpp', -1)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)', paddingHorizontal: 10 }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="remove" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('dpp', 1)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)' }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.quickAddText}>+1</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Card3D>
 
@@ -247,13 +269,30 @@ export default function PlannerScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              onPress={() => handleQuickAdd('pyq')}
-              style={[styles.quickAddBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)' }]}
-            >
-              <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.quickAddText}>+5 Done</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('pyq', -1)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)', paddingHorizontal: 10 }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="remove" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('pyq', 1)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)' }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.quickAddText}>+1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('pyq', 5)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(16, 185, 129, 0.45)', paddingHorizontal: 9 }]}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.quickAddText}>+5</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Card3D>
 
@@ -272,13 +311,31 @@ export default function PlannerScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              onPress={() => setNightModalVisible(true)}
-              style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)' }]}
-            >
-              <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
-              <Text style={styles.quickAddText}>Review</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('hours', -0.5)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)', paddingHorizontal: 10 }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="remove" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleProgressDelta('hours', 0.5)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)' }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.quickAddText}>+30m</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setNightModalVisible(true)}
+                style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.45)' }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
+                <Text style={styles.quickAddText}>9 PM</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Card3D>
 

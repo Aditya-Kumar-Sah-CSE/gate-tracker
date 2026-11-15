@@ -20,12 +20,22 @@ export async function seedDefaultSubjects(db: SQLiteDatabase, force: boolean = f
 
   for (const subj of DEFAULT_GATE_SUBJECTS) {
     await db.runAsync(
-      `INSERT OR REPLACE INTO subjects (
+      `INSERT INTO subjects (
         id, code, name, icon, color, gradient_start, gradient_end,
         queue_order, total_lectures, completed_lectures, is_lecture_count_estimated,
         total_dpps, completed_dpps, pyqs_attempted, pyqs_correct, pyqs_target,
         is_active, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        code = excluded.code,
+        name = excluded.name,
+        icon = excluded.icon,
+        color = excluded.color,
+        gradient_start = excluded.gradient_start,
+        gradient_end = excluded.gradient_end,
+        total_lectures = CASE WHEN subjects.total_lectures <= 0 THEN excluded.total_lectures ELSE subjects.total_lectures END,
+        total_dpps = CASE WHEN subjects.total_dpps <= 0 THEN excluded.total_dpps ELSE subjects.total_dpps END,
+        pyqs_target = CASE WHEN subjects.pyqs_target <= 0 THEN excluded.pyqs_target ELSE subjects.pyqs_target END;`,
       [
         subj.id,
         subj.code,

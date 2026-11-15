@@ -46,7 +46,7 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.1.0</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.2.0</Text>
                   <Text style={styles.headerSubtitle}>{"New update features & fixes active!"}</Text>
                 </View>
               </View>

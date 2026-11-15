@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,6 +43,7 @@ export function NightReviewModal({
   const [pyqsDone, setPyqsDone] = useState<number>(0);
   const [studyHours, setStudyHours] = useState<number>(8);
   const [reflection, setReflection] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
 
   useEffect(() => {
@@ -93,6 +95,8 @@ export function NightReviewModal({
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -110,8 +114,15 @@ export function NightReviewModal({
 
       onSaved(updatedProg);
       onClose();
-    } catch (e) {
-      console.error(e);
+      Alert.alert(
+        '🌙 9:00 PM Review Confirmed!',
+        `Today's Achievement: ${score}% Target Met!\n• ${lecturesDone} Lectures\n• ${dppsDone} DPP Sheets\n• ${pyqsDone} PYQs\n• ${studyHours}h Focused Study\n\nDaily streak is recorded! 🔥`
+      );
+    } catch (e: any) {
+      console.error('Night review error:', e);
+      Alert.alert('Save Failed', e?.message || 'Could not save night review.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -368,7 +379,12 @@ export function NightReviewModal({
             />
 
             {/* Save & Celebrate Button */}
-            <TouchableOpacity onPress={handleSave} style={styles.saveBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              onPress={handleSave}
+              style={[styles.saveBtn, isSaving && { opacity: 0.65 }]}
+              activeOpacity={0.85}
+              disabled={isSaving}
+            >
               <LinearGradient
                 colors={Gradients.cyberViolet as any}
                 start={{ x: 0, y: 0 }}
@@ -376,7 +392,9 @@ export function NightReviewModal({
                 style={styles.saveBtnGradient}
               >
                 <Ionicons name="flame" size={20} color="#FFD700" />
-                <Text style={styles.saveBtnText}>{"CONFIRM & SAVE TODAY'S STREAK 🔥"}</Text>
+                <Text style={styles.saveBtnText}>
+                  {isSaving ? 'CONFIRMING...' : "CONFIRM & SAVE TODAY'S STREAK 🔥"}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 
