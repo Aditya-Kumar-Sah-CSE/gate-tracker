@@ -367,7 +367,7 @@ export default function SettingsScreen() {
         <View style={styles.versionRow}>
           <View>
             <Text style={styles.versionTitle}>GATE TRACK 90</Text>
-            <Text style={styles.versionSub}>Release Version 1.2.0 (Build 3)</Text>
+            <Text style={styles.versionSub}>Release Version 1.3.0 (Build 4)</Text>
           </View>
           <View style={styles.versionTag}>
             <Text style={styles.versionTagText}>LATEST</Text>

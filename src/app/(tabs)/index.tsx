@@ -21,9 +21,9 @@ import {
   getTodayProgress,
   getWeeklyActivity,
   getOverallStats,
-  updateSubjectProgress,
   toggleSubjectStatus,
   updateTodayProgressItem,
+  setSubjectActive,
 } from '../../db/database';
 import { Subject, DailyGoal, DailyProgress, DayActivity } from '../../types';
 import { Colors, Gradients } from '../../constants/theme';
@@ -32,6 +32,7 @@ import { CircularProgress } from '../../components/CircularProgress';
 import { MorningTargetModal } from '../../components/MorningTargetModal';
 import { NightReviewModal } from '../../components/NightReviewModal';
 import { VersionUpdateModal } from '../../components/VersionUpdateModal';
+import { RadialJourneyView } from '../../components/RadialJourneyView';
 
 let hasAutoShownVersion = false;
 let hasAutoOpenedNightReviewToday = false;
@@ -42,6 +43,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [queuedSubjects, setQueuedSubjects] = useState<Subject[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
   const [todayProgress, setTodayProgress] = useState<DailyProgress | null>(null);
   const [weeklyActivity, setWeeklyActivity] = useState<DayActivity[]>([]);
@@ -88,6 +90,7 @@ export default function DashboardScreen() {
       ]);
 
       setActiveSubject(activeSubj);
+      setAllSubjects(allSubjs);
       setQueuedSubjects(allSubjs.filter((s) => s.id !== activeSubj?.id));
       setTodayGoal(goal);
       setTodayProgress(prog);
@@ -118,18 +121,9 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleQuickAdd = async (
-    subjectId: string,
-    type: 'lecture' | 'dpp' | 'pyq'
-  ) => {
+  const handleSelectSubject = async (subjectId: string) => {
     triggerHaptic();
-    if (type === 'lecture') {
-      await updateSubjectProgress(subjectId, { completed_lectures: 1 });
-    } else if (type === 'dpp') {
-      await updateSubjectProgress(subjectId, { completed_dpps: 1 });
-    } else {
-      await updateSubjectProgress(subjectId, { pyqs_attempted: 1, pyqs_correct: 1 });
-    }
+    await setSubjectActive(subjectId);
     await loadDashboardData();
     triggerRefresh();
   };
@@ -219,14 +213,22 @@ export default function DashboardScreen() {
         {/* Top Header */}
         <View style={styles.topHeader}>
           <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              style={styles.batchSelectorPill}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.batchSelectorText}>PW Parakram Batch B 2027</Text>
+              <Ionicons name="chevron-down" size={13} color="#C084FC" />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <Text style={styles.appTitle}>GATE TRACK 90</Text>
               <TouchableOpacity
                 onPress={() => setVersionModalVisible(true)}
                 style={styles.versionBadge}
                 activeOpacity={0.8}
               >
-                <Text style={styles.versionBadgeText}>v1.2.0 🚀</Text>
+                <Text style={styles.versionBadgeText}>v1.3.0 🚀</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
@@ -251,6 +253,49 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* TOP MILESTONE PROGRESS CARD (Matching Image 2 Top) */}
+        <Card3D gradient={Gradients.cardGlassDark as any} style={styles.topMilestoneCard}>
+          <View style={styles.milestoneRow}>
+            {/* Left Circular Ring */}
+            <View style={styles.milestoneRingCol}>
+              <CircularProgress
+                size={70}
+                strokeWidth={7}
+                percentage={totalScore}
+                color="#A855F7"
+                centerText={`${totalScore}%`}
+              />
+            </View>
+
+            {/* Center Lesson / Lecture Progress */}
+            <View style={styles.milestoneTextCol}>
+              <Text style={styles.milestoneTitle}>
+                {completedLectures} / {targetLectures} Lessons
+              </Text>
+              <Text style={styles.milestoneSub}>{"You're doing great! 💪"}</Text>
+              <View style={styles.milestoneTrack}>
+                <LinearGradient
+                  colors={['#A855F7', '#6366F1']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.milestoneFill, { width: `${Math.max(8, totalScore)}%` }]}
+                />
+              </View>
+            </View>
+
+            {/* Right 3D Golden Treasure Chest with Glow */}
+            <View style={styles.chestContainer}>
+              <View style={styles.chestGlow} />
+              <LinearGradient
+                colors={['rgba(251, 191, 36, 0.25)', 'rgba(168, 85, 247, 0.2)']}
+                style={styles.chestBox}
+              >
+                <Text style={{ fontSize: 32 }}>🎁</Text>
+              </LinearGradient>
+            </View>
+          </View>
+        </Card3D>
+
         {/* 2 Primary Action Banners: Morning Target & Night 9 PM Review */}
         <View style={styles.actionPillRow}>
           {/* Morning Kickoff Pill */}
@@ -263,7 +308,7 @@ export default function DashboardScreen() {
               colors={
                 todayGoal?.is_morning_set === 1
                   ? (['#065F46', '#047857'] as any)
-                  : (['#B45309', '#D97706'] as any)
+                  : (['#7C3AED', '#9333EA'] as any)
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -293,7 +338,7 @@ export default function DashboardScreen() {
                   ? (['#4C1D95', '#6D28D9'] as any)
                   : isPast9PM
                   ? (['#BE123C', '#E11D48'] as any)
-                  : (['#1E293B', '#334155'] as any)
+                  : (['#1E1B4B', '#2E1065'] as any)
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -356,363 +401,306 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* FEATURED: Real 3D Active Subject Card */}
+        {/* CENTERPIECE: RADIAL JOURNEY WHEEL & SKILL RADAR CHART (Image 2) */}
+        <RadialJourneyView
+          subjects={allSubjects}
+          activeSubjectId={activeSubject?.id || 'cs_cp'}
+          onSelectSubject={handleSelectSubject}
+          lecturePct={Math.round(lectureRatio * 100)}
+          dppPct={Math.round(dppRatio * 100)}
+          pyqPct={Math.round(pyqRatio * 100)}
+          studyPct={Math.round(Math.min(1, studyHours / targetHours) * 100)}
+          overallPct={totalScore}
+        />
+
+        {/* ACTIVE SUBJECT MISSION CARD (Matching Lesson 15 Card in Image 2) */}
         {activeSubject && (
           <View style={styles.sectionWrap}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeader}>★ ACTIVE SUBJECT IN QUEUE</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/roadmap')}>
-                <Text style={styles.viewQueueLink}>Manage Queue →</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Card3D
-              gradient={[activeSubject.gradient_start, activeSubject.gradient_end] as any}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroTop}>
-                <View style={styles.heroBadgePill}>
-                  <Text style={styles.heroBadgeText}>TOP PRIORITY (#1)</Text>
+            <Card3D gradient={Gradients.cardGlassDark as any} style={styles.missionCard}>
+              <View style={styles.missionCardInner}>
+                {/* 3D Notepad Icon with Glowing Aura */}
+                <View style={styles.notepadCol}>
+                  <View style={styles.notepadAura} />
+                  <LinearGradient
+                    colors={['#3B82F6', '#8B5CF6']}
+                    style={styles.notepadSquare}
+                  >
+                    <Text style={{ fontSize: 32 }}>📋</Text>
+                  </LinearGradient>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  {/* Status Toggle on Active Subject Card */}
-                  <TouchableOpacity
-                    onPress={() =>
-                      handleToggleActiveStatus(
-                        activeSubject.status === 'done' ? 'doing' : 'done'
-                      )
-                    }
-                    style={[
-                      styles.heroTogglePill,
-                      activeSubject.status === 'done'
-                        ? styles.heroToggleDone
-                        : styles.heroToggleDoing,
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={
-                        activeSubject.status === 'done'
-                          ? 'checkmark-circle'
-                          : 'flash'
+                {/* Main Content Col */}
+                <View style={styles.missionMainCol}>
+                  <View style={styles.missionHeaderRow}>
+                    <View style={styles.missionBadgePill}>
+                      <Text style={styles.missionBadgeText}>
+                        Subject #{activeSubject.queue_order || 1}
+                      </Text>
+                    </View>
+
+                    {/* Status Toggle on Active Subject */}
+                    <TouchableOpacity
+                      onPress={() =>
+                        handleToggleActiveStatus(
+                          activeSubject.status === 'done' ? 'doing' : 'done'
+                        )
                       }
-                      size={12}
-                      color="#FFFFFF"
+                      style={[
+                        styles.heroTogglePill,
+                        activeSubject.status === 'done'
+                          ? styles.heroToggleDone
+                          : styles.heroToggleDoing,
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={activeSubject.status === 'done' ? 'checkmark-circle' : 'flash'}
+                        size={11}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.heroToggleText}>
+                        {activeSubject.status === 'done' ? 'Done' : 'Doing'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.missionSubjectTitle}>{activeSubject.name}</Text>
+                  <Text style={styles.missionSubjectDesc}>
+                    {"Master core concepts, solve DPPs & attempt PYQs"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 4 Skill Mini Breakdown Bars with clickable count adjustments */}
+              <View style={styles.skillBarsGrid}>
+                {/* 1. Lectures */}
+                <View style={styles.skillBarItem}>
+                  <View style={styles.skillBarTopRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 11 }}>📗</Text>
+                      <Text style={styles.skillName}>Lectures</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.skillPctText}>{Math.round(lectureRatio * 100)}%</Text>
+                      {/* Interactive Buttons */}
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('lecture', -1)}
+                        style={styles.miniAdjustBtn}
+                      >
+                        <Ionicons name="remove" size={12} color="#A78BFA" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('lecture', 1)}
+                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(168, 85, 247, 0.35)' }]}
+                      >
+                        <Ionicons name="add" size={12} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.skillTrack}>
+                    <View
+                      style={[
+                        styles.skillFill,
+                        {
+                          width: `${Math.round(lectureRatio * 100)}%`,
+                          backgroundColor: '#10B981',
+                        },
+                      ]}
                     />
-                    <Text style={styles.heroToggleText}>
-                      {activeSubject.status === 'done' ? 'Done' : 'Doing'}
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
+                </View>
 
-                  <TouchableOpacity
-                    onPress={() => startTimer(activeSubject.id, 'lecture')}
-                    style={styles.timerChip}
-                  >
-                    <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
-                    <Text style={styles.timerChipText}>Timer</Text>
-                  </TouchableOpacity>
+                {/* 2. DPP Sheets */}
+                <View style={styles.skillBarItem}>
+                  <View style={styles.skillBarTopRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 11 }}>📖</Text>
+                      <Text style={styles.skillName}>DPPs</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.skillPctText}>{Math.round(dppRatio * 100)}%</Text>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('dpp', -1)}
+                        style={styles.miniAdjustBtn}
+                      >
+                        <Ionicons name="remove" size={12} color="#38BDF8" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('dpp', 1)}
+                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(56, 189, 248, 0.35)' }]}
+                      >
+                        <Ionicons name="add" size={12} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.skillTrack}>
+                    <View
+                      style={[
+                        styles.skillFill,
+                        {
+                          width: `${Math.round(dppRatio * 100)}%`,
+                          backgroundColor: '#F59E0B',
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* 3. GATE PYQs */}
+                <View style={styles.skillBarItem}>
+                  <View style={styles.skillBarTopRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 11 }}>🎤</Text>
+                      <Text style={styles.skillName}>PYQs</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.skillPctText}>{Math.round(pyqRatio * 100)}%</Text>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('pyq', -1)}
+                        style={styles.miniAdjustBtn}
+                      >
+                        <Ionicons name="remove" size={12} color="#34D399" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('pyq', 1)}
+                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(52, 211, 153, 0.35)' }]}
+                      >
+                        <Ionicons name="add" size={12} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('pyq', 5)}
+                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(52, 211, 153, 0.45)', width: 28 }]}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>+5</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.skillTrack}>
+                    <View
+                      style={[
+                        styles.skillFill,
+                        {
+                          width: `${Math.round(pyqRatio * 100)}%`,
+                          backgroundColor: '#06B6D4',
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* 4. Study Hours */}
+                <View style={styles.skillBarItem}>
+                  <View style={styles.skillBarTopRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 11 }}>🖊️</Text>
+                      <Text style={styles.skillName}>Writing / Study</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.skillPctText}>
+                        {Math.round(Math.min(1, studyHours / targetHours) * 100)}%
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('hours', -0.5)}
+                        style={styles.miniAdjustBtn}
+                      >
+                        <Ionicons name="remove" size={12} color="#C084FC" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleProgressDelta('hours', 0.5)}
+                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(192, 132, 252, 0.35)' }]}
+                      >
+                        <Ionicons name="add" size={12} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => startTimer(activeSubject.id, 'lecture')}
+                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(168, 85, 247, 0.45)', width: 28 }]}
+                      >
+                        <Ionicons name="timer-outline" size={12} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.skillTrack}>
+                    <View
+                      style={[
+                        styles.skillFill,
+                        {
+                          width: `${Math.round(Math.min(1, studyHours / targetHours) * 100)}%`,
+                          backgroundColor: '#A855F7',
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
               </View>
 
-              <Text style={styles.heroSubjectName}>{activeSubject.name}</Text>
-              <Text style={styles.heroSubjectCode}>{activeSubject.code}</Text>
-
-              {/* 3 Metric Rows with 1-Tap Quick Increment Buttons */}
-              <View style={styles.heroMetricsGrid}>
-                {/* Lectures */}
-                <View style={styles.heroMetricCol}>
-                  <Text style={styles.heroMetricLabel}>LECTURES</Text>
-                  <Text style={styles.heroMetricVal}>
-                    {activeSubject.completed_lectures}
-                    <Text style={styles.heroMetricSub}>/{activeSubject.total_lectures}</Text>
+              {/* Glowing 3D Continue Button (Image 2) */}
+              <TouchableOpacity
+                onPress={() => setMorningModalVisible(true)}
+                activeOpacity={0.85}
+                style={styles.missionContinueWrap}
+              >
+                <LinearGradient
+                  colors={Gradients.gamifiedPurple as any}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.missionContinueBtn}
+                >
+                  <Text style={styles.missionContinueText}>
+                    {todayGoal?.is_morning_set === 1 ? 'Update Target 🚀' : 'Lock Today\'s Target 🚀'}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => handleQuickAdd(activeSubject.id, 'lecture')}
-                    style={styles.heroAddBtn}
-                  >
-                    <Ionicons name="add" size={14} color="#FFFFFF" />
-                    <Text style={styles.heroAddText}>Seen +1</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* DPP */}
-                <View style={styles.heroMetricCol}>
-                  <Text style={styles.heroMetricLabel}>DPP SOLVED</Text>
-                  <Text style={styles.heroMetricVal}>
-                    {activeSubject.completed_dpps}
-                    <Text style={styles.heroMetricSub}>/{activeSubject.total_dpps}</Text>
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => handleQuickAdd(activeSubject.id, 'dpp')}
-                    style={[styles.heroAddBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)' }]}
-                  >
-                    <Ionicons name="add" size={14} color="#FFFFFF" />
-                    <Text style={styles.heroAddText}>DPP +1</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* PYQ */}
-                <View style={styles.heroMetricCol}>
-                  <Text style={styles.heroMetricLabel}>GATE PYQS</Text>
-                  <Text style={styles.heroMetricVal}>
-                    {activeSubject.pyqs_attempted}
-                    <Text style={styles.heroMetricSub}> Solved</Text>
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => handleQuickAdd(activeSubject.id, 'pyq')}
-                    style={[styles.heroAddBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)' }]}
-                  >
-                    <Ionicons name="add" size={14} color="#FFFFFF" />
-                    <Text style={styles.heroAddText}>PYQ +1</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
             </Card3D>
           </View>
         )}
 
-        {/* Today's Target vs Achieved Interactive Command Center */}
+        {/* ACHIEVEMENTS SECTION (Matching Image 2 Bottom) */}
         <View style={styles.sectionWrap}>
           <View style={styles.sectionHeaderRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.sectionHeader}>{"TODAY'S TARGET & LIVE COUNTERS"}</Text>
-              <View
-                style={[
-                  styles.targetLockPill,
-                  todayGoal?.is_morning_set === 1 ? styles.targetLockedBg : styles.targetUnlockedBg,
-                ]}
-              >
-                <Ionicons
-                  name={todayGoal?.is_morning_set === 1 ? 'lock-closed' : 'alert-circle'}
-                  size={10}
-                  color={todayGoal?.is_morning_set === 1 ? '#10B981' : '#F59E0B'}
-                />
-                <Text
-                  style={[
-                    styles.targetLockPillText,
-                    { color: todayGoal?.is_morning_set === 1 ? '#10B981' : '#F59E0B' },
-                  ]}
-                >
-                  {todayGoal?.is_morning_set === 1 ? 'LOCKED' : 'NOT SET'}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={() => setMorningModalVisible(true)} activeOpacity={0.8}>
-              <Text style={styles.viewQueueLink}>
-                {todayGoal?.is_morning_set === 1 ? 'Edit Target ✏️' : 'Lock Target 🌅'}
-              </Text>
+            <Text style={styles.achievementsTitle}>Achievements</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/analytics')}>
+              <Text style={styles.viewAllLink}>View all &gt;</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Locked Subject Tag Banner if active */}
-          {activeSubject && (
-            <View style={[styles.targetSubjectBanner, { borderColor: activeSubject.color }]}>
-              <Ionicons name="sparkles" size={14} color="#FFD700" />
-              <Text style={styles.targetSubjectBannerText}>
-                Focus Subject: <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{activeSubject.name} ({activeSubject.code})</Text>
-              </Text>
-            </View>
-          )}
-
-          {/* 3D Target Command Center Card */}
-          <Card3D gradient={Gradients.cardGlassDark as any} style={styles.targetStatusCard}>
-            {/* Top Ring + Overview */}
-            <View style={styles.targetStatusRow}>
-              <View style={styles.ringCol}>
-                <CircularProgress
-                  size={92}
-                  strokeWidth={9}
-                  percentage={totalScore}
-                  color="#8B5CF6"
-                  centerText={`${totalScore}%`}
-                  centerSubtext="Target"
-                />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.achievementsScroll}>
+            {/* Card 1: 🏆 GATE Crusher */}
+            <View style={styles.achievementCard}>
+              <View style={styles.achievementIconCircle}>
+                <Text style={{ fontSize: 22 }}>🏆</Text>
               </View>
-
-              <View style={styles.statsBreakdown}>
-                <Text style={styles.targetOverviewTitle}>
-                  {totalScore >= 100 ? '🎉 All Targets Met!' : `${totalScore}% Achieved Today`}
-                </Text>
-                <Text style={styles.targetOverviewSub}>
-                  {completedLectures}/{targetLectures} Lec • {completedDpps}/{targetDpps} DPP • {completedPyqs}/{targetPyqs} PYQ • {studyHours}h/{targetHours}h
-                </Text>
-                <View style={styles.targetStreakRow}>
-                  <Ionicons name="flame" size={14} color="#F59E0B" />
-                  <Text style={styles.targetStreakText}>Day {prepDay.day} Streak Active</Text>
-                </View>
-              </View>
+              <Text style={styles.achievementName}>GATE Crusher</Text>
+              <Text style={styles.achievementDesc}>Complete 12 subjects</Text>
             </View>
 
-            {/* 4 Clickable Interactive Action Counter Rows */}
-            <View style={styles.counterCardsGrid}>
-              {/* 1. PW Lectures Counter Row */}
-              <View style={styles.interactiveCounterRow}>
-                <View style={styles.counterLeftCol}>
-                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.25)' }]}>
-                    <Ionicons name="play-circle" size={18} color="#A78BFA" />
-                  </View>
-                  <View>
-                    <Text style={styles.counterRowLabel}>PW Lectures</Text>
-                    <Text style={styles.counterRowSub}>
-                      {completedLectures} of {targetLectures} Seen
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.counterControlsWrap}>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('lecture', -1)}
-                    style={styles.counterAdjustBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="remove" size={16} color="#A78BFA" />
-                  </TouchableOpacity>
-                  <View style={styles.counterDisplayBox}>
-                    <Text style={[styles.counterDisplayVal, { color: '#A78BFA' }]}>
-                      {completedLectures}
-                      <Text style={styles.counterDisplayTarget}>/{targetLectures}</Text>
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('lecture', 1)}
-                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(139, 92, 246, 0.35)' }]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={16} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
+            {/* Card 2: 🔥 7 Day Streak */}
+            <View style={styles.achievementCard}>
+              <View style={[styles.achievementIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.18)' }]}>
+                <Text style={{ fontSize: 22 }}>🔥</Text>
               </View>
-
-              {/* 2. DPP Sheets Counter Row */}
-              <View style={styles.interactiveCounterRow}>
-                <View style={styles.counterLeftCol}>
-                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(6, 182, 212, 0.25)' }]}>
-                    <Ionicons name="document-text" size={18} color="#38BDF8" />
-                  </View>
-                  <View>
-                    <Text style={styles.counterRowLabel}>DPP Sheets</Text>
-                    <Text style={styles.counterRowSub}>
-                      {completedDpps} of {targetDpps} Solved
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.counterControlsWrap}>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('dpp', -1)}
-                    style={styles.counterAdjustBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="remove" size={16} color="#38BDF8" />
-                  </TouchableOpacity>
-                  <View style={styles.counterDisplayBox}>
-                    <Text style={[styles.counterDisplayVal, { color: '#38BDF8' }]}>
-                      {completedDpps}
-                      <Text style={styles.counterDisplayTarget}>/{targetDpps}</Text>
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('dpp', 1)}
-                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(6, 182, 212, 0.35)' }]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={16} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* 3. GATE PYQs Counter Row */}
-              <View style={styles.interactiveCounterRow}>
-                <View style={styles.counterLeftCol}>
-                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(16, 185, 129, 0.25)' }]}>
-                    <Ionicons name="checkmark-done-circle" size={18} color="#34D399" />
-                  </View>
-                  <View>
-                    <Text style={styles.counterRowLabel}>GATE PYQs</Text>
-                    <Text style={styles.counterRowSub}>
-                      {completedPyqs} of {targetPyqs} Done
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.counterControlsWrap}>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('pyq', -1)}
-                    style={styles.counterAdjustBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="remove" size={16} color="#34D399" />
-                  </TouchableOpacity>
-                  <View style={styles.counterDisplayBox}>
-                    <Text style={[styles.counterDisplayVal, { color: '#34D399' }]}>
-                      {completedPyqs}
-                      <Text style={styles.counterDisplayTarget}>/{targetPyqs}</Text>
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('pyq', 1)}
-                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(16, 185, 129, 0.35)' }]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={16} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('pyq', 5)}
-                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(16, 185, 129, 0.45)', width: 38 }]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>+5</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* 4. Study Hours Counter Row */}
-              <View style={styles.interactiveCounterRow}>
-                <View style={styles.counterLeftCol}>
-                  <View style={[styles.counterIconBadge, { backgroundColor: 'rgba(245, 158, 11, 0.25)' }]}>
-                    <Ionicons name="time" size={18} color="#FBBF24" />
-                  </View>
-                  <View>
-                    <Text style={styles.counterRowLabel}>Study Hours</Text>
-                    <Text style={styles.counterRowSub}>
-                      {studyHours}h of {targetHours}h Logged
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.counterControlsWrap}>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('hours', -0.5)}
-                    style={styles.counterAdjustBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="remove" size={16} color="#FBBF24" />
-                  </TouchableOpacity>
-                  <View style={styles.counterDisplayBox}>
-                    <Text style={[styles.counterDisplayVal, { color: '#FBBF24' }]}>
-                      {studyHours}h
-                      <Text style={styles.counterDisplayTarget}>/{targetHours}h</Text>
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleProgressDelta('hours', 0.5)}
-                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)' }]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={16} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => startTimer(activeSubject?.id || 'cs_cp', 'lecture')}
-                    style={[styles.counterAdjustBtn, { backgroundColor: 'rgba(245, 158, 11, 0.45)', width: 42 }]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="timer-outline" size={14} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <Text style={styles.achievementName}>7 Day Streak</Text>
+              <Text style={styles.achievementDesc}>Study 7 days in a row</Text>
             </View>
-          </Card3D>
+
+            {/* Card 3: 📚 PYQ Champion */}
+            <View style={styles.achievementCard}>
+              <View style={[styles.achievementIconCircle, { backgroundColor: 'rgba(99, 102, 241, 0.18)' }]}>
+                <Text style={{ fontSize: 22 }}>📚</Text>
+              </View>
+              <Text style={styles.achievementName}>PYQ Champion</Text>
+              <Text style={styles.achievementDesc}>Solve 500+ PYQs</Text>
+            </View>
+
+            {/* Card 4: ⚡ Focus Titan */}
+            <View style={styles.achievementCard}>
+              <View style={[styles.achievementIconCircle, { backgroundColor: 'rgba(6, 182, 212, 0.18)' }]}>
+                <Text style={{ fontSize: 22 }}>⚡</Text>
+              </View>
+              <Text style={styles.achievementName}>Focus Titan</Text>
+              <Text style={styles.achievementDesc}>100h deep study</Text>
+            </View>
+          </ScrollView>
         </View>
 
         {/* Queued Next Subjects Preview */}
@@ -735,7 +723,7 @@ export default function DashboardScreen() {
                 return (
                   <TouchableOpacity
                     key={subj.id}
-                    onPress={() => router.push('/(tabs)/roadmap')}
+                    onPress={() => handleSelectSubject(subj.id)}
                     activeOpacity={0.8}
                     style={styles.queueMiniCard}
                   >
@@ -851,7 +839,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 10,
+  },
+  batchSelectorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  batchSelectorText: {
+    color: '#E0E7FF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   appTitle: {
     color: '#FFFFFF',
@@ -904,6 +910,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // TOP MILESTONE PROGRESS CARD STYLES
+  topMilestoneCard: {
+    borderRadius: 20,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.25)',
+  },
+  milestoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  milestoneRingCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: 10,
+  },
+  milestoneTextCol: {
+    flex: 1,
+    paddingHorizontal: 6,
+  },
+  milestoneTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  milestoneSub: {
+    color: '#C084FC',
+    fontSize: 12,
+    fontWeight: '600',
+    marginVertical: 4,
+  },
+  milestoneTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  milestoneFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  chestContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 54,
+    height: 54,
+    marginLeft: 6,
+  },
+  chestGlow: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F59E0B',
+    opacity: 0.25,
+  },
+  chestBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.4)',
+  },
   actionPillRow: {
     flexDirection: 'row',
     gap: 10,
@@ -955,8 +1030,185 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  heroCard: {
+  // ACTIVE MISSION CARD (IMAGE 2 LESSON 15 CARD)
+  missionCard: {
     borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.28)',
+  },
+  missionCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notepadCol: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    height: 60,
+  },
+  notepadAura: {
+    position: 'absolute',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#8B5CF6',
+    opacity: 0.25,
+  },
+  notepadSquare: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(192, 132, 252, 0.35)',
+  },
+  missionMainCol: {
+    flex: 1,
+  },
+  missionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  missionBadgePill: {
+    backgroundColor: 'rgba(168, 85, 247, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  missionBadgeText: {
+    color: '#E9D5FF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  missionSubjectTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  missionSubjectDesc: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  // 4 Skill Mini Breakdown Bars
+  skillBarsGrid: {
+    marginTop: 14,
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  skillBarItem: {
+    gap: 4,
+  },
+  skillBarTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skillName: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  skillPctText: {
+    color: '#C084FC',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  miniAdjustBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skillTrack: {
+    height: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  skillFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  missionContinueWrap: {
+    marginTop: 14,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  missionContinueBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  missionContinueText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  // ACHIEVEMENTS STYLES (MATCHING IMAGE 2 BOTTOM)
+  achievementsTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  viewAllLink: {
+    color: '#C084FC',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  achievementsScroll: {
+    marginHorizontal: -4,
+    marginTop: 4,
+  },
+  achievementCard: {
+    backgroundColor: 'rgba(26, 21, 62, 0.85)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.22)',
+    padding: 12,
+    width: 124,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  achievementIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(251, 191, 36, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  achievementName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  achievementDesc: {
+    color: '#94A3B8',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
   },
   heroTop: {
     flexDirection: 'row',

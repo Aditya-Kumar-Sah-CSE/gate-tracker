@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { runMigrations, seedDefaultSubjects } from './migrations';
+import { runMigrations, seedDefaultSubjects, ensureSubjectSchema } from './migrations';
 import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 import {
   AppSettings,
@@ -27,6 +27,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!dbInstance) {
     dbInstance = await SQLite.openDatabaseAsync('gate_track_90.db');
     await dbInstance.execAsync('PRAGMA foreign_keys = ON;');
+    await ensureSubjectSchema(dbInstance);
     await runMigrations(dbInstance);
   }
   return dbInstance;
@@ -184,19 +185,27 @@ export async function setSubjectActive(subjectId: string): Promise<void> {
     if (!target) return;
 
     // Shift all other subjects down if target wasn't #1
-    const currentOrder = target.queue_order;
+    const currentOrder = target.queue_order ?? 1;
     if (currentOrder > 1) {
-      await db.runAsync(
-        'UPDATE subjects SET queue_order = queue_order + 1 WHERE queue_order < ?;',
-        [currentOrder]
-      );
+      try {
+        await db.runAsync(
+          'UPDATE subjects SET queue_order = queue_order + 1 WHERE queue_order < ?;',
+          [currentOrder]
+        );
+      } catch (e) {
+        console.warn('Shift queue_order warning:', e);
+      }
     }
 
-    await db.runAsync('UPDATE subjects SET is_active = 0 WHERE is_active = 1;');
-    await db.runAsync(
-      'UPDATE subjects SET is_active = 1, status = "doing", queue_order = 1 WHERE id = ?;',
-      [subjectId]
-    );
+    try {
+      await db.runAsync('UPDATE subjects SET is_active = 0 WHERE is_active = 1;');
+      await db.runAsync(
+        'UPDATE subjects SET is_active = 1, status = "doing", queue_order = 1 WHERE id = ?;',
+        [subjectId]
+      );
+    } catch (e) {
+      console.warn('Set active subject warning:', e);
+    }
   });
 }
 

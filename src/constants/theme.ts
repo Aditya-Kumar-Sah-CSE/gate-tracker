@@ -5,27 +5,31 @@ export const Gradients = {
   electricEmerald: ['#10B981', '#059669', '#047857'] as const,
   solarGold: ['#F59E0B', '#EF4444', '#DC2626'] as const,
   neonPurple: ['#A855F7', '#7C3AED', '#4F46E5'] as const,
-  cardGlassDark: ['rgba(25, 30, 45, 0.85)', 'rgba(15, 18, 28, 0.95)'] as const,
+  gamifiedPurple: ['#9333EA', '#7C3AED', '#4F46E5'] as const,
+  gemActive: ['#C084FC', '#9333EA', '#6D28D9'] as const,
+  gemStone: ['rgba(55, 45, 105, 0.85)', 'rgba(28, 23, 62, 0.92)'] as const,
+  goldChest: ['#FBBF24', '#F59E0B', '#D97706'] as const,
+  cardGlassDark: ['rgba(30, 24, 72, 0.88)', 'rgba(18, 14, 46, 0.96)'] as const,
   cardGlassLight: ['rgba(255, 255, 255, 0.95)', 'rgba(241, 245, 249, 0.90)'] as const,
   glareOverlay: ['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0.0)'] as const,
 };
 
 export const Colors = {
   dark: {
-    bg: '#080A10',
-    card: '#111522',
-    surface: '#161C2E',
-    surfaceLight: '#1E263D',
-    border: 'rgba(255, 255, 255, 0.10)',
-    borderSubtle: 'rgba(255, 255, 255, 0.05)',
-    borderGlow: 'rgba(99, 102, 241, 0.4)',
+    bg: '#0E0B25', // Deep midnight cosmic purple (Image 2)
+    card: '#1A153E',
+    surface: '#221C52',
+    surfaceLight: '#2C2466',
+    border: 'rgba(168, 85, 247, 0.22)',
+    borderSubtle: 'rgba(168, 85, 247, 0.10)',
+    borderGlow: 'rgba(168, 85, 247, 0.55)',
     text: '#F8FAFC',
-    textMuted: '#94A3B8',
-    textSubtle: '#64748B',
-    primary: '#38BDF8', // Cyan
-    primarySoft: 'rgba(56, 189, 248, 0.15)',
-    secondary: '#818CF8', // Indigo
-    secondarySoft: 'rgba(129, 140, 248, 0.15)',
+    textMuted: '#A5B4FC',
+    textSubtle: '#818CF8',
+    primary: '#8B5CF6', // Purple/Violet
+    primarySoft: 'rgba(139, 92, 246, 0.18)',
+    secondary: '#6366F1', // Indigo
+    secondarySoft: 'rgba(99, 102, 241, 0.18)',
     success: '#10B981', // Emerald
     successSoft: 'rgba(16, 185, 129, 0.15)',
     warning: '#F59E0B', // Amber
@@ -33,14 +37,14 @@ export const Colors = {
     danger: '#F43F5E', // Rose
     dangerSoft: 'rgba(244, 63, 94, 0.15)',
     accent: '#A855F7', // Purple
-    accentSoft: 'rgba(168, 85, 247, 0.15)',
+    accentSoft: 'rgba(168, 85, 247, 0.18)',
     neonFlame: '#FF512F',
     neonCyan: '#06B6D4',
     neonEmerald: '#10B981',
-    neonViolet: '#8B5CF6',
-    neonGold: '#F59E0B',
-    navBg: '#090C14',
-    tabBarBorder: 'rgba(255, 255, 255, 0.08)',
+    neonViolet: '#A855F7',
+    neonGold: '#FBBF24',
+    navBg: '#110D2C',
+    tabBarBorder: 'rgba(168, 85, 247, 0.20)',
     statusBar: 'light-content' as const,
   },
   light: {

@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.2.0</Text>
-                  <Text style={styles.headerSubtitle}>{"New update features & fixes active!"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.0</Text>
+                  <Text style={styles.headerSubtitle}>{"Gamified Radial Journey & Fixes Active!"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -61,12 +61,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
-                  <Ionicons name="list" size={18} color="#FFFFFF" />
+                  <Ionicons name="planet" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>All 12 Subjects Active & Loaded</Text>
+                  <Text style={styles.featureTitle}>Cosmic Radial Journey Wheel</Text>
                   <Text style={styles.featureDesc}>
-                    Permanent database self-healing guarantee. All 12 GATE CSE subjects from PW Batch are visible in the study queue.
+                    Dynamic 12-subject celestial path with 3D crystal gem nodes, gold completion stars, and live active diamond pin indicator.
                   </Text>
                 </View>
               </View>
@@ -76,12 +76,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
-                  <Ionicons name="toggle" size={18} color="#FFFFFF" />
+                  <Ionicons name="pie-chart" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Side Toggle: [ Doing | Done ]</Text>
+                  <Text style={styles.featureTitle}>Center 4-Axis Skill Radar Chart</Text>
                   <Text style={styles.featureDesc}>
-                    {'Every subject card has a side toggle to mark it actively "Doing" or completed "Done" with 1 tap.'}
+                    Illuminated polygon visualizing Lectures, DPPs, PYQs, and Study Writing with overall preparation score.
                   </Text>
                 </View>
               </View>
@@ -91,12 +91,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
-                  <Ionicons name="sunny" size={18} color="#FFFFFF" />
+                  <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Step 1 ➔ Step 2 Morning Target</Text>
+                  <Text style={styles.featureTitle}>Database Schema Auto-Healing</Text>
                   <Text style={styles.featureDesc}>
-                    Select your focus subject first, then lock daily Lectures, DPP, PYQ, and Study Hours for the day.
+                    Resolved &apos;no such column: queue_order&apos; error with automatic PRAGMA schema repair and safe null-coalescing.
                   </Text>
                 </View>
               </View>
@@ -106,12 +106,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#06B6D4' }]}>
-                  <Ionicons name="moon" size={18} color="#FFFFFF" />
+                  <Ionicons name="add-circle" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>9:00 PM Night Target Confirmation</Text>
+                  <Text style={styles.featureTitle}>Interactive 1-Tap Counter Controls</Text>
                   <Text style={styles.featureDesc}>
-                    Check in every evening to confirm what you achieved vs your morning goal and save your daily streak!
+                    Clickable [-] and [+] controls directly on the active mission card to log Lectures, DPPs, PYQs (+1, +5), and study hours in real time.
                   </Text>
                 </View>
               </View>
