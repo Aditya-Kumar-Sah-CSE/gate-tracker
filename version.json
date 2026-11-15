@@ -1,18 +1,15 @@
 {
-  "version": "1.3.3",
-  "versionCode": 7,
+  "version": "1.3.4",
+  "versionCode": 8,
   "releaseDate": "2026-11-15",
-  "releaseTitle": "v1.3.3 • 3D Gamified Popups & Auto-Updater",
+  "releaseTitle": "v1.3.4 • Planner Study Time Removed & Active Subject 3D Confirmation",
   "releaseNotes": [
-    "Gamified 3D Popups: Replaced plain white system dialogs with 3D cosmic cards",
-    "In-App Auto Updater: Automatic update notifications & 1-tap APK download",
-    "Target Lock Celebration: Interactive achievement modal with glowing stats",
-    "Night Review 3D Summary: Cosmic day completion card with streak banner",
-    "3D Queue Subject Editor: Radiant inputs, switches, and gradient buttons",
-    "Clean Distraction-Free Flow: Integrated PYQ and lecture metrics"
+    "Removed Study Time from Planner screen (strictly 3 pillars: Lectures, DPPs, PYQs)",
+    "Removed 'Focus Titan' study-hour achievement from Home screen",
+    "3D Confirmation Popup when setting any subject as #1 Active Focus",
+    "Clean, punchy keyword-driven UI without verbose text across all screens"
   ],
   "downloadUrl": "https://github.com/Aditya-Kumar-Sah-CSE/gate-tracker/raw/main/GATE_TRACK_90.apk",
   "releasesUrl": "https://github.com/Aditya-Kumar-Sah-CSE/gate-tracker/releases",
   "minSupportedVersionCode": 1
 }
-

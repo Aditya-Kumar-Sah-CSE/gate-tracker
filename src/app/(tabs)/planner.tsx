@@ -94,7 +94,6 @@ export default function PlannerScreen() {
   const totalWeeklyLec = weeklyActivity.reduce((acc, d) => acc + d.lectures, 0);
   const totalWeeklyDpp = weeklyActivity.reduce((acc, d) => acc + d.dpps, 0);
   const totalWeeklyPyq = weeklyActivity.reduce((acc, d) => acc + d.pyqs, 0);
-  const totalWeeklyHours = Math.round(weeklyActivity.reduce((acc, d) => acc + d.studyHours, 0) * 10) / 10;
 
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16) + 8;
@@ -110,9 +109,9 @@ export default function PlannerScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Daily & Weekly Planner</Text>
+            <Text style={styles.headerTitle}>Daily Planner</Text>
             <Text style={styles.headerSubtitle}>
-              Target setting & 9 PM achievement tracking
+              Daily targets • 9 PM review
             </Text>
           </View>
           <TouchableOpacity
@@ -302,49 +301,6 @@ export default function PlannerScreen() {
           </View>
         </Card3D>
 
-        {/* 4. Study Hours Target */}
-        <Card3D gradient={Gradients.solarGold as any} style={styles.targetCard}>
-          <View style={styles.targetRow}>
-            <View style={styles.targetLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.3)' }]}>
-                <Ionicons name="time" size={20} color="#FFFFFF" />
-              </View>
-              <View>
-                <Text style={styles.targetTitle}>STUDY TIME</Text>
-                <Text style={styles.targetSub}>
-                  {Math.round(((todayProgress?.total_study_seconds || 0) / 3600) * 10) / 10}h of{' '}
-                  {todayGoal ? Math.round(todayGoal.target_study_minutes / 60) : 8}h Logged
-                </Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <TouchableOpacity
-                onPress={() => handleProgressDelta('hours', -0.5)}
-                style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)', paddingHorizontal: 10 }]}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="remove" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleProgressDelta('hours', 0.5)}
-                style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.35)' }]}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={16} color="#FFFFFF" />
-                <Text style={styles.quickAddText}>+30m</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setNightModalVisible(true)}
-                style={[styles.quickAddBtn, { backgroundColor: 'rgba(245, 158, 11, 0.45)' }]}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
-                <Text style={styles.quickAddText}>9 PM</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Card3D>
-
         {/* Weekly Summary Card */}
         <Text style={[styles.sectionTitle, { marginTop: 18 }]}>7-DAY SUMMARY TOTALS</Text>
         <Card3D gradient={Gradients.cardGlassDark as any} style={styles.summaryCard}>
@@ -360,10 +316,6 @@ export default function PlannerScreen() {
             <View style={styles.summaryCol}>
               <Text style={styles.summaryNum}>{totalWeeklyPyq}</Text>
               <Text style={styles.summaryLabel}>PYQs Solved</Text>
-            </View>
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryNum}>{totalWeeklyHours}h</Text>
-              <Text style={styles.summaryLabel}>Study Hours</Text>
             </View>
           </View>
         </Card3D>

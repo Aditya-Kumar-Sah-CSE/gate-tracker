@@ -29,6 +29,7 @@ import {
 import { Subject } from '../../types';
 import { Colors, Gradients } from '../../constants/theme';
 import { Card3D } from '../../components/Card3D';
+import { CosmicModal } from '../../components/CosmicModal';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function QueueScreen() {
@@ -42,6 +43,10 @@ export default function QueueScreen() {
   const [editTotalLec, setEditTotalLec] = useState('');
   const [editIsEstimated, setEditIsEstimated] = useState(false);
   const [editTotalDpps, setEditTotalDpps] = useState('');
+
+  // Active Subject Confirmation Modal State
+  const [confirmSubject, setConfirmSubject] = useState<Subject | null>(null);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -90,9 +95,19 @@ export default function QueueScreen() {
     triggerRefresh();
   };
 
-  const handleMakeActive = async (subjectId: string) => {
+  const promptMakeActive = (subj: Subject) => {
     triggerHaptic();
-    await setSubjectActive(subjectId);
+    setConfirmSubject(subj);
+    setConfirmModalVisible(true);
+  };
+
+  const handleConfirmActive = async () => {
+    if (!confirmSubject) return;
+    const targetId = confirmSubject.id;
+    setConfirmModalVisible(false);
+    setConfirmSubject(null);
+    triggerHaptic();
+    await setSubjectActive(targetId);
     await loadData();
     triggerRefresh();
   };
@@ -154,7 +169,7 @@ export default function QueueScreen() {
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.headerTitle}>GATE Study Queue</Text>
             <Text style={styles.headerSubtitle}>
-              Organize subjects in your priority order • Side toggle: Doing / Done
+              Priority queue • #1 Active • Doing / Done
             </Text>
           </View>
           <View style={styles.headerRightActions}>
@@ -449,8 +464,9 @@ export default function QueueScreen() {
                 {/* Make Active Shortcut if not #1 */}
                 {!isActive && (
                   <TouchableOpacity
-                    onPress={() => handleMakeActive(subj.id)}
+                    onPress={() => promptMakeActive(subj)}
                     style={styles.makeActiveBtn}
+                    activeOpacity={0.8}
                   >
                     <Ionicons name="star" size={14} color="#FFD700" />
                     <Text style={styles.makeActiveText}>SET AS ACTIVE SUBJECT</Text>
@@ -552,6 +568,21 @@ export default function QueueScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Set Active Subject Confirmation Modal */}
+        <CosmicModal
+          visible={confirmModalVisible}
+          onClose={() => setConfirmModalVisible(false)}
+          badgeEmoji="⭐"
+          badgeGradient={Gradients.goldChest}
+          title="Set Active Focus? 🎯"
+          tag={confirmSubject ? `${confirmSubject.code} • ${confirmSubject.name}` : undefined}
+          subtitle="Switch your primary study focus to this subject?"
+          primaryButtonText="SET ACTIVE ⚡"
+          onPrimaryPress={handleConfirmActive}
+          secondaryButtonText="CANCEL"
+          onSecondaryPress={() => setConfirmModalVisible(false)}
+        />
       </View>
     </SafeAreaView>
   );

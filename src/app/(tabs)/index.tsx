@@ -694,15 +694,6 @@ export default function DashboardScreen() {
               <Text style={styles.achievementName}>PYQ Champion</Text>
               <Text style={styles.achievementDesc}>Solve 500+ PYQs</Text>
             </View>
-
-            {/* Card 4: ⚡ Focus Titan */}
-            <View style={styles.achievementCard}>
-              <View style={[styles.achievementIconCircle, { backgroundColor: 'rgba(6, 182, 212, 0.18)' }]}>
-                <Text style={{ fontSize: 22 }}>⚡</Text>
-              </View>
-              <Text style={styles.achievementName}>Focus Titan</Text>
-              <Text style={styles.achievementDesc}>100h deep study</Text>
-            </View>
           </ScrollView>
         </View>
 

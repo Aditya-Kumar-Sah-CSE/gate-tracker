@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.3</Text>
-                  <Text style={styles.headerSubtitle}>{"3D Gamified Popups & In-App Auto Updater"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.4</Text>
+                  <Text style={styles.headerSubtitle}>{"Pure 3 Pillars • 3D Confirmation • Clean UI"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -60,13 +60,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 1 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
-                  <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
+                  <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>3D Gamified Popups Everywhere</Text>
+                  <Text style={styles.featureTitle}>Pure 3 Pillars (Study Time Removed)</Text>
                   <Text style={styles.featureDesc}>
-                    Replaced default white system alert dialogs with high-end 3D cosmic celebration cards, radiant orb badges, and fiery streak callouts.
+                    Removed study hours from Planner and Target cards. Focus is now 100% on concrete deliverables: PW Lectures, DPP Sheets, and GATE PYQs.
                   </Text>
                 </View>
               </View>
@@ -76,12 +76,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
-                  <Ionicons name="cloud-download" size={18} color="#FFFFFF" />
+                  <Ionicons name="star" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>In-App Auto-Update Engine</Text>
+                  <Text style={styles.featureTitle}>3D Active Subject Confirmation</Text>
                   <Text style={styles.featureDesc}>
-                    No need to manually hunt for APKs. The app detects new updates automatically and lets you download and install with 1 tap.
+                    Switching your primary active subject now shows a radiant 3D confirmation card, preventing accidental changes to your priority queue.
                   </Text>
                 </View>
               </View>
@@ -90,13 +90,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 3 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
-                  <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
+                  <Ionicons name="sparkles" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>3 Core Pillars Target Lock</Text>
+                  <Text style={styles.featureTitle}>Cosmic 3D Theme & Concise UI</Text>
                   <Text style={styles.featureDesc}>
-                    Morning target setting is streamlined strictly around PW Lectures, DPP Sheets, and GATE PYQs for 100% focused preparation.
+                    No long verbose text or theory. Clean keyword-driven badges, glowing progress rings, and consistent 3D styling across every tab.
                   </Text>
                 </View>
               </View>
@@ -106,12 +106,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#06B6D4' }]}>
-                  <Ionicons name="color-palette" size={18} color="#FFFFFF" />
+                  <Ionicons name="cloud-download" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Cosmic 3D Subject Editor</Text>
+                  <Text style={styles.featureTitle}>1-Tap In-App Auto-Updater</Text>
                   <Text style={styles.featureDesc}>
-                    Queue subject editor redesigned with radiant dark glass inputs, custom switches, and vibrant 3D buttons matching the global theme.
+                    Get live update notifications and download the latest signed APK directly within the app without manual browser downloads.
                   </Text>
                 </View>
               </View>
