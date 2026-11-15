@@ -35,6 +35,8 @@ import { MorningTargetModal } from '../../components/MorningTargetModal';
 import { NightReviewModal } from '../../components/NightReviewModal';
 import { VersionUpdateModal } from '../../components/VersionUpdateModal';
 import { RadialJourneyView } from '../../components/RadialJourneyView';
+import { UpdateAvailableModal } from '../../components/UpdateAvailableModal';
+import { checkForAppUpdate, AppUpdateInfo } from '../../services/updateService';
 
 let hasAutoShownVersion = false;
 let hasAutoOpenedNightReviewToday = false;
@@ -68,6 +70,8 @@ export default function DashboardScreen() {
   const [morningModalVisible, setMorningModalVisible] = useState(false);
   const [nightModalVisible, setNightModalVisible] = useState(false);
   const [versionModalVisible, setVersionModalVisible] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
 
   // Auto-pop version update modal once on initial app launch
   useEffect(() => {
@@ -98,6 +102,13 @@ export default function DashboardScreen() {
       setTodayProgress(prog);
       setWeeklyActivity(week);
       setStats(allStats);
+
+      // Check for available updates in background
+      checkForAppUpdate().then((info) => {
+        if (info && info.updateAvailable) {
+          setUpdateInfo(info);
+        }
+      }).catch(() => {});
     } catch (e) {
       console.error('Failed to load dashboard:', e);
     }
@@ -200,8 +211,9 @@ export default function DashboardScreen() {
   const studyHours = Math.round((studySeconds / 3600) * 10) / 10;
   const targetHours = todayGoal ? Math.round(todayGoal.target_study_minutes / 60) : 8;
 
-  const totalScore = Math.round(
-    ((lectureRatio + dppRatio + pyqRatio + Math.min(1, studyHours / targetHours)) / 4) * 100
+  const totalScore = Math.min(
+    100,
+    Math.round(((lectureRatio + dppRatio + pyqRatio) / 3) * 100)
   );
 
   const insets = useSafeAreaInsets();
@@ -234,7 +246,7 @@ export default function DashboardScreen() {
                 style={styles.versionBadge}
                 activeOpacity={0.8}
               >
-                <Text style={styles.versionBadgeText}>v1.3.2 🚀</Text>
+                <Text style={styles.versionBadgeText}>v1.3.3 🚀</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
@@ -258,6 +270,35 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* IN-APP UPDATE AVAILABLE BANNER */}
+        {updateInfo?.updateAvailable && (
+          <TouchableOpacity
+            onPress={() => setUpdateModalVisible(true)}
+            style={styles.updateAvailableBanner}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#F59E0B', '#EF4444', '#DC2626']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.updateBannerGradient}
+            >
+              <View style={styles.updateBannerLeft}>
+                <Text style={{ fontSize: 18 }}>🚀</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.updateBannerTitle}>
+                    New Update Available: v{updateInfo.latestVersion}
+                  </Text>
+                  <Text style={styles.updateBannerSub}>Tap to download & install update ⚡</Text>
+                </View>
+              </View>
+              <View style={styles.updateBannerPill}>
+                <Text style={styles.updateBannerPillText}>UPDATE</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* TOP MILESTONE PROGRESS CARD (Matching Image 2 Top) */}
         <Card3D gradient={Gradients.cardGlassDark as any} style={styles.topMilestoneCard}>
@@ -593,44 +634,6 @@ export default function DashboardScreen() {
                     />
                   </View>
                 </View>
-
-                {/* 4. Study Hours */}
-                <View style={styles.skillBarItem}>
-                  <View style={styles.skillBarTopRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: 11 }}>🖊️</Text>
-                      <Text style={styles.skillName}>Writing / Study</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.skillPctText}>
-                        {Math.round(Math.min(1, studyHours / targetHours) * 100)}%
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => handleProgressDelta('hours', -0.5)}
-                        style={styles.miniAdjustBtn}
-                      >
-                        <Ionicons name="remove" size={12} color="#C084FC" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleProgressDelta('hours', 0.5)}
-                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(192, 132, 252, 0.35)' }]}
-                      >
-                        <Ionicons name="add" size={12} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.skillTrack}>
-                    <View
-                      style={[
-                        styles.skillFill,
-                        {
-                          width: `${Math.round(Math.min(1, studyHours / targetHours) * 100)}%`,
-                          backgroundColor: '#A855F7',
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
               </View>
 
               {/* Glowing 3D Continue Button (Image 2) */}
@@ -814,10 +817,17 @@ export default function DashboardScreen() {
         }}
       />
 
-      {/* Version v1.1.0 Update Modal */}
+      {/* Version Update Modal */}
       <VersionUpdateModal
         visible={versionModalVisible}
         onClose={() => setVersionModalVisible(false)}
+      />
+
+      {/* In-App Auto-Updater Modal */}
+      <UpdateAvailableModal
+        visible={updateModalVisible}
+        onClose={() => setUpdateModalVisible(false)}
+        updateInfo={updateInfo}
       />
     </SafeAreaView>
   );
@@ -877,6 +887,52 @@ const styles = StyleSheet.create({
     color: '#C084FC',
     fontSize: 10,
     fontWeight: '800',
+  },
+  updateAvailableBanner: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 12,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  updateBannerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  updateBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  updateBannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  updateBannerSub: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  updateBannerPill: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  updateBannerPillText: {
+    color: '#DC2626',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
   subtitle: {
     color: '#94A3B8',

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Switch,
-  Alert,
   Platform,
   StatusBar,
 } from 'react-native';
@@ -23,6 +22,9 @@ import {
 } from '../db/database';
 import { DatabaseBackup } from '../types';
 import { Badge } from '../components/Badge';
+import { CosmicModal } from '../components/CosmicModal';
+import { UpdateAvailableModal } from '../components/UpdateAvailableModal';
+import { checkForAppUpdate, AppUpdateInfo, APP_VERSION, APP_VERSION_CODE } from '../services/updateService';
 
 export default function SettingsScreen() {
   const { settings, updateSettings, triggerRefresh, theme, setTheme } = useAppStore();
@@ -40,6 +42,26 @@ export default function SettingsScreen() {
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [cosmicModalVisible, setCosmicModalVisible] = useState(false);
+  const [cosmicModalConfig, setCosmicModalConfig] = useState<{
+    title: string;
+    subtitle?: string;
+    type?: 'success' | 'warning' | 'info' | 'error';
+    badgeEmoji?: string;
+  }>({ title: '' });
+
+  const showCosmicAlert = (
+    title: string,
+    subtitle?: string,
+    type: 'success' | 'warning' | 'info' | 'error' = 'success',
+    badgeEmoji: string = '✨'
+  ) => {
+    setCosmicModalConfig({ title, subtitle, type, badgeEmoji });
+    setCosmicModalVisible(true);
+  };
 
   const handleSaveSettings = async () => {
     try {
@@ -57,9 +79,36 @@ export default function SettingsScreen() {
       });
 
       triggerRefresh();
-      Alert.alert('Settings Saved', 'Target configurations updated successfully.');
+      showCosmicAlert(
+        'Settings Saved! ⚙️',
+        'Target configurations and daily preparation parameters updated successfully.',
+        'success',
+        '⚙️'
+      );
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update settings');
+      showCosmicAlert('Error Saving Settings', err.message || 'Failed to update settings', 'error', '⚠️');
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const info = await checkForAppUpdate();
+      if (info && info.updateAvailable) {
+        setUpdateInfo(info);
+        setUpdateModalVisible(true);
+      } else {
+        showCosmicAlert(
+          'All Up To Date! ✨',
+          `You are running the latest version v${APP_VERSION} (Build ${APP_VERSION_CODE}). No new updates available right now.`,
+          'success',
+          '🚀'
+        );
+      }
+    } catch (err: any) {
+      showCosmicAlert('Update Check Failed', err?.message || 'Could not reach update server. Check network.', 'error', '⚠️');
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -83,62 +132,38 @@ export default function SettingsScreen() {
           UTI: 'public.json'
         });
       } else {
-        Alert.alert('Backup Exported', `Saved to ${fileUri}`);
+        showCosmicAlert('Backup Exported 📁', `Saved to ${fileUri}`, 'success', '💾');
       }
     } catch (e: any) {
-      Alert.alert('Export Failed', e.message || 'Could not export database backup');
+      showCosmicAlert('Export Failed', e.message || 'Could not export database backup', 'error', '⚠️');
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleImportBackupConfirm = () => {
-    if (Platform.OS === 'ios' && 'prompt' in Alert) {
-      (Alert as any).prompt(
-        'Import JSON Backup',
-        'Paste your valid JSON backup string below to restore all records:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Restore Data',
-            onPress: async (text?: string) => {
-              if (!text) return;
-              await runImport(text);
-            }
-          }
-        ],
-        'plain-text'
-      );
-    } else {
-      Alert.alert(
-        'Restore Data',
-        'Ensure your backup JSON file was exported from GATE TRACK 90. Press Confirm to test restore integrity.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Confirm',
-            onPress: async () => {
-              Alert.alert(
-                'Android JSON Restore',
-                'To import, place your backup file in the app documents folder or paste via prompt. Backup integrity verification is active.'
-              );
-            }
-          }
-        ]
-      );
-    }
-  };
-
-  const runImport = async (jsonStr: string) => {
+  const handleImportBackupConfirm = async () => {
     try {
-      setIsImporting(true);
-      const parsed = JSON.parse(jsonStr) as DatabaseBackup;
-      await importDatabaseFromJson(parsed);
-      triggerRefresh();
-      Alert.alert('Restore Complete', 'All study records restored successfully.');
-      router.replace('/(tabs)');
-    } catch (err: any) {
-      Alert.alert('Import Failed', `Invalid backup format: ${err.message}`);
+      const fileName = `GATE_TRACK_90_BACKUP_${new Date().toISOString().slice(0, 10)}.json`;
+      const fileUri = `${FileSystem.documentDirectory || ''}${fileName}`;
+      const info = await FileSystem.getInfoAsync(fileUri);
+      if (info.exists) {
+        setIsImporting(true);
+        const content = await FileSystem.readAsStringAsync(fileUri);
+        const parsed = JSON.parse(content) as DatabaseBackup;
+        await importDatabaseFromJson(parsed);
+        triggerRefresh();
+        showCosmicAlert('Restore Complete! 🎉', 'All study records restored successfully from backup.', 'success', '✨');
+        router.replace('/(tabs)');
+      } else {
+        showCosmicAlert(
+          'Restore Backup 📥',
+          'Place your exported GATE_TRACK_90_BACKUP_YYYY-MM-DD.json file in the app documents folder to auto-restore.',
+          'info',
+          '📥'
+        );
+      }
+    } catch (e: any) {
+      showCosmicAlert('Import Failed', e?.message || 'Could not restore backup file.', 'error', '⚠️');
     } finally {
       setIsImporting(false);
     }
@@ -148,7 +173,8 @@ export default function SettingsScreen() {
   const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16) + 8;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: topInset }]}>
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: topInset }]}>
       <StatusBar barStyle="light-content" />
       {/* Batch Information Card */}
       <View style={styles.batchCard}>
@@ -364,25 +390,61 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* App Version Info Card */}
+      {/* App Version & In-App Update Engine */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Ionicons name="information-circle-outline" size={18} color="#C084FC" />
-          <Text style={styles.cardTitle}>App Information</Text>
+          <Text style={styles.cardTitle}>App Information & Updates</Text>
         </View>
         <View style={styles.versionRow}>
           <View>
             <Text style={styles.versionTitle}>GATE TRACK 90</Text>
-            <Text style={styles.versionSub}>Release Version 1.3.2 (Build 6)</Text>
+            <Text style={styles.versionSub}>Release Version 1.3.3 (Build 7)</Text>
           </View>
           <View style={styles.versionTag}>
-            <Text style={styles.versionTagText}>LATEST</Text>
+            <Text style={styles.versionTagText}>OFFICIAL</Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          onPress={handleCheckUpdates}
+          disabled={isCheckingUpdate}
+          style={styles.checkUpdateBtn}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={isCheckingUpdate ? 'sync' : 'cloud-download-outline'}
+            size={16}
+            color="#FFFFFF"
+          />
+          <Text style={styles.checkUpdateText}>
+            {isCheckingUpdate ? 'Checking for updates...' : 'Check for Updates Now 🔄'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <View style={{ height: 40 }} />
     </ScrollView>
+
+    {/* 3D Cosmic Alert Modal */}
+    <CosmicModal
+      visible={cosmicModalVisible}
+      onClose={() => setCosmicModalVisible(false)}
+      badgeEmoji={cosmicModalConfig.badgeEmoji}
+      title={cosmicModalConfig.title}
+      subtitle={cosmicModalConfig.subtitle}
+      type={cosmicModalConfig.type}
+      primaryButtonText="GOT IT"
+      onPrimaryPress={() => setCosmicModalVisible(false)}
+    />
+
+    {/* In-App Auto-Updater Modal */}
+    <UpdateAvailableModal
+      visible={updateModalVisible}
+      onClose={() => setUpdateModalVisible(false)}
+      updateInfo={updateInfo}
+    />
+  </>
   );
 }
 
@@ -588,5 +650,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  checkUpdateBtn: {
+    marginTop: 14,
+    backgroundColor: '#8B5CF6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  checkUpdateText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

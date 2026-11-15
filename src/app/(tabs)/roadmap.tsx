@@ -27,8 +27,9 @@ import {
   resetAllSubjectsToDefault,
 } from '../../db/database';
 import { Subject } from '../../types';
-import { Colors } from '../../constants/theme';
+import { Colors, Gradients } from '../../constants/theme';
 import { Card3D } from '../../components/Card3D';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function QueueScreen() {
   const { dataVersion, triggerRefresh } = useAppStore();
@@ -462,59 +463,92 @@ export default function QueueScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Edit Subject Modal */}
+        {/* 3D Edit Subject Modal */}
         <Modal visible={editModalVisible} transparent animationType="fade">
           <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Edit Subject Parameters</Text>
-              <Text style={styles.modalSub}>{editingSubj?.name}</Text>
+            <View style={styles.modalCardContainer}>
+              <LinearGradient
+                colors={['rgba(192, 132, 252, 0.45)', 'rgba(99, 102, 241, 0.25)', 'rgba(168, 85, 247, 0.15)'] as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalBorderGradient}
+              >
+                <View style={styles.modalCard}>
+                  {/* Top Floating Orb Badge */}
+                  <View style={styles.modalOrbRing}>
+                    <LinearGradient
+                      colors={Gradients.cyberViolet as any}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.modalOrbInner}
+                    >
+                      <Ionicons name="pencil" size={20} color="#FFFFFF" />
+                    </LinearGradient>
+                  </View>
 
-              <Text style={styles.inputLabel}>Subject Name</Text>
-              <TextInput
-                style={styles.input}
-                value={editName}
-                onChangeText={setEditName}
-                placeholderTextColor="#64748B"
-              />
+                  <Text style={styles.modalTitle}>Edit Subject Parameters</Text>
+                  <Text style={styles.modalSub}>{editingSubj?.code} • {editingSubj?.name}</Text>
 
-              <Text style={styles.inputLabel}>Total Lectures</Text>
-              <TextInput
-                style={styles.input}
-                value={editTotalLec}
-                onChangeText={setEditTotalLec}
-                keyboardType="numeric"
-                placeholderTextColor="#64748B"
-              />
+                  <Text style={styles.inputLabel}>Subject Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholderTextColor="#64748B"
+                  />
 
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Is Lecture Count Estimated?</Text>
-                <Switch
-                  value={editIsEstimated}
-                  onValueChange={setEditIsEstimated}
-                  trackColor={{ false: '#334155', true: '#8B5CF6' }}
-                />
-              </View>
+                  <Text style={styles.inputLabel}>Total Lectures</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editTotalLec}
+                    onChangeText={setEditTotalLec}
+                    keyboardType="numeric"
+                    placeholderTextColor="#64748B"
+                  />
 
-              <Text style={styles.inputLabel}>Total DPP Sheets</Text>
-              <TextInput
-                style={styles.input}
-                value={editTotalDpps}
-                onChangeText={setEditTotalDpps}
-                keyboardType="numeric"
-                placeholderTextColor="#64748B"
-              />
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchLabel}>Is Lecture Count Estimated?</Text>
+                    <Switch
+                      value={editIsEstimated}
+                      onValueChange={setEditIsEstimated}
+                      trackColor={{ false: '#334155', true: '#8B5CF6' }}
+                    />
+                  </View>
 
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  onPress={() => setEditModalVisible(false)}
-                  style={styles.modalCancelBtn}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={saveEdit} style={styles.modalSaveBtn}>
-                  <Text style={styles.modalSaveText}>Save Changes</Text>
-                </TouchableOpacity>
-              </View>
+                  <Text style={styles.inputLabel}>Total DPP Sheets</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editTotalDpps}
+                    onChangeText={setEditTotalDpps}
+                    keyboardType="numeric"
+                    placeholderTextColor="#64748B"
+                  />
+
+                  <View style={styles.modalBtnRow}>
+                    <TouchableOpacity
+                      onPress={() => setEditModalVisible(false)}
+                      style={styles.modalCancelBtn}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={saveEdit}
+                      style={styles.modalSaveBtn}
+                      activeOpacity={0.85}
+                    >
+                      <LinearGradient
+                        colors={Gradients.sunsetBlaze as any}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.modalSaveGradient}
+                      >
+                        <Text style={styles.modalSaveText}>Save Changes 💾</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </LinearGradient>
             </View>
           </View>
         </Modal>
@@ -783,42 +817,85 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(5, 3, 18, 0.88)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
+  modalCardContainer: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 26,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 26,
+    elevation: 20,
+  },
+  modalBorderGradient: {
+    padding: 1.5,
+    borderRadius: 26,
+  },
   modalCard: {
-    backgroundColor: Colors.dark.card,
-    borderRadius: 22,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: '#120D2C',
+    borderRadius: 24.5,
+    paddingTop: 30,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    position: 'relative',
+  },
+  modalOrbRing: {
+    position: 'absolute',
+    top: -26,
+    alignSelf: 'center',
+    left: '50%',
+    marginLeft: -26,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(18, 13, 44, 0.95)',
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#C084FC',
+    elevation: 10,
+  },
+  modalOrbInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalTitle: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
+    textAlign: 'center',
   },
   modalSub: {
-    color: '#94A3B8',
-    fontSize: 13,
+    color: '#A5B4FC',
+    fontSize: 12.5,
+    textAlign: 'center',
     marginBottom: 16,
+    marginTop: 2,
   },
   inputLabel: {
-    color: '#CBD5E1',
+    color: '#E0E7FF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 6,
     marginTop: 8,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(28, 22, 68, 0.7)',
     borderRadius: 12,
     padding: 12,
     color: '#FFFFFF',
     fontSize: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(168, 85, 247, 0.25)',
   },
   switchRow: {
     flexDirection: 'row',
@@ -838,23 +915,31 @@ const styles = StyleSheet.create({
   modalCancelBtn: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   modalCancelText: {
     color: '#94A3B8',
     fontWeight: '700',
+    fontSize: 13,
   },
   modalSaveBtn: {
-    flex: 1,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    padding: 14,
+    flex: 1.4,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  modalSaveGradient: {
+    paddingVertical: 13,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalSaveText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
+    fontSize: 13.5,
   },
 });

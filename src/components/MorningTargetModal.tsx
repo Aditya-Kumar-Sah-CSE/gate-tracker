@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +16,7 @@ import { getSubjectsInQueue, saveMorningGoals } from '../db/database';
 import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 import { Colors, Gradients } from '../constants/theme';
 import { Card3D } from './Card3D';
+import { CosmicModal } from './CosmicModal';
 
 interface MorningTargetModalProps {
   visible: boolean;
@@ -36,8 +36,10 @@ export function MorningTargetModal({
   const [targetLectures, setTargetLectures] = useState<number>(5);
   const [targetDpps, setTargetDpps] = useState<number>(2);
   const [targetPyqs, setTargetPyqs] = useState<number>(20);
-  const [targetHours, setTargetHours] = useState<number>(8);
   const [isSaving, setIsSaving] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (!visible) return;
@@ -53,7 +55,6 @@ export function MorningTargetModal({
           setTargetLectures(currentGoal.target_lectures);
           setTargetDpps(currentGoal.target_dpps);
           setTargetPyqs(currentGoal.target_pyqs);
-          setTargetHours(Math.round(currentGoal.target_study_minutes / 60));
           if (currentGoal.focus_subject_id) {
             setSelectedSubjectId(currentGoal.focus_subject_id);
           }
@@ -81,21 +82,23 @@ export function MorningTargetModal({
         target_lectures: targetLectures,
         target_dpps: targetDpps,
         target_pyqs: targetPyqs,
-        target_study_minutes: targetHours * 60,
+        target_study_minutes: 480, // Default 8h in DB background
         focus_subject_id: selectedSubjectId,
       });
       onSaved(goal);
-      onClose();
-      Alert.alert(
-        '🎯 Target Locked!',
-        `Today's Focus: ${selectedSubj?.name || 'Selected'}\n• ${targetLectures} Lectures\n• ${targetDpps} DPP Sheets\n• ${targetPyqs} PYQs\n• ${targetHours} Hours Study Time\n\nDaily streak is active! 🚀`
-      );
+      setSuccessModalVisible(true);
     } catch (e: any) {
       console.error('Target lock error:', e);
-      Alert.alert('Lock Failed', e?.message || 'Could not lock target. Please try again.');
+      setErrorMessage(e?.message || 'Could not lock target. Please try again.');
+      setErrorModalVisible(true);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModalVisible(false);
+    onClose();
   };
 
   const triggerHaptic = () => {
@@ -109,7 +112,8 @@ export function MorningTargetModal({
   const selectedSubj = displaySubjects.find((s) => s.id === selectedSubjectId) || displaySubjects[0];
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <>
+      <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           {/* Header */}
@@ -311,37 +315,6 @@ export function MorningTargetModal({
               </View>
             </Card3D>
 
-            {/* Target 4: Study Hours */}
-            <Card3D gradient={Gradients.solarGold as any} style={styles.targetCard}>
-              <View style={styles.targetRow}>
-                <View style={styles.targetInfo}>
-                  <Text style={styles.targetLabel}>STUDY TIME</Text>
-                  <Text style={styles.targetSub}>Deep focused study target</Text>
-                </View>
-                <View style={styles.counterRow}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      setTargetHours((v) => Math.max(2, v - 1));
-                    }}
-                    style={styles.counterBtn}
-                  >
-                    <Ionicons name="remove" size={18} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <Text style={styles.counterValue}>{targetHours}h</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      setTargetHours((v) => v + 1);
-                    }}
-                    style={styles.counterBtn}
-                  >
-                    <Ionicons name="add" size={18} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Card3D>
-
             {/* Motivational Footer */}
             <View style={styles.quoteBox}>
               <Text style={styles.quoteText}>
@@ -374,6 +347,53 @@ export function MorningTargetModal({
         </View>
       </View>
     </Modal>
+
+    {/* 3D Target Locked Celebration Modal */}
+    <CosmicModal
+      visible={successModalVisible}
+      onClose={handleSuccessClose}
+      badgeEmoji="🎯"
+      badgeGradient={Gradients.sunsetBlaze}
+      title="Target Locked! 🎯"
+      tag={selectedSubj ? `${selectedSubj.code} • ${selectedSubj.name}` : undefined}
+      subtitle="Today's GATE mission is sealed in the queue. Execute with discipline!"
+      items={[
+        {
+          icon: 'play-circle',
+          label: 'PW Lectures',
+          value: targetLectures,
+          color: '#C084FC',
+        },
+        {
+          icon: 'document-text',
+          label: 'DPP Sheets',
+          value: targetDpps,
+          color: '#38BDF8',
+        },
+        {
+          icon: 'trophy',
+          label: 'GATE PYQs',
+          value: targetPyqs,
+          color: '#10B981',
+        },
+      ]}
+      streakText="Daily streak is active! 🚀 Consistency in lectures + DPPs guarantees GATE 2027 success."
+      primaryButtonText="LET'S CRUSH IT 🚀"
+      onPrimaryPress={handleSuccessClose}
+    />
+
+    {/* 3D Error Modal */}
+    <CosmicModal
+      visible={errorModalVisible}
+      onClose={() => setErrorModalVisible(false)}
+      type="error"
+      badgeEmoji="⚠️"
+      title="Lock Failed"
+      subtitle={errorMessage}
+      primaryButtonText="GOT IT"
+      onPrimaryPress={() => setErrorModalVisible(false)}
+    />
+  </>
   );
 }
 

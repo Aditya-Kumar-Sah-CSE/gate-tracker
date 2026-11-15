@@ -1,0 +1,18 @@
+{
+  "version": "1.3.3",
+  "versionCode": 7,
+  "releaseDate": "2026-11-15",
+  "releaseTitle": "v1.3.3 • 3D Gamified Popups & Auto-Updater",
+  "releaseNotes": [
+    "Gamified 3D Popups: Replaced plain white system dialogs with 3D cosmic cards",
+    "In-App Auto Updater: Automatic update notifications & 1-tap APK download",
+    "Target Lock Celebration: Interactive achievement modal with glowing stats",
+    "Night Review 3D Summary: Cosmic day completion card with streak banner",
+    "3D Queue Subject Editor: Radiant inputs, switches, and gradient buttons",
+    "Clean Distraction-Free Flow: Integrated PYQ and lecture metrics"
+  ],
+  "downloadUrl": "https://github.com/Aditya-Kumar-Sah-CSE/gate-tracker/raw/main/GATE_TRACK_90.apk",
+  "releasesUrl": "https://github.com/Aditya-Kumar-Sah-CSE/gate-tracker/releases",
+  "minSupportedVersionCode": 1
+}
+

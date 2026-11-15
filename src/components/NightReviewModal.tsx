@@ -8,7 +8,6 @@ import {
   ScrollView,
   TextInput,
   Platform,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +23,7 @@ import {
 import { DEFAULT_GATE_SUBJECTS } from '../constants/gateSyllabus';
 import { Colors, Gradients } from '../constants/theme';
 import { Card3D } from './Card3D';
+import { CosmicModal } from './CosmicModal';
 
 interface NightReviewModalProps {
   visible: boolean;
@@ -45,6 +45,9 @@ export function NightReviewModal({
   const [reflection, setReflection] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [todayGoal, setTodayGoal] = useState<DailyGoal | null>(null);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (!visible) return;
@@ -113,17 +116,19 @@ export function NightReviewModal({
       });
 
       onSaved(updatedProg);
-      onClose();
-      Alert.alert(
-        '🌙 9:00 PM Review Confirmed!',
-        `Today's Achievement: ${score}% Target Met!\n• ${lecturesDone} Lectures\n• ${dppsDone} DPP Sheets\n• ${pyqsDone} PYQs\n• ${studyHours}h Focused Study\n\nDaily streak is recorded! 🔥`
-      );
+      setSuccessModalVisible(true);
     } catch (e: any) {
       console.error('Night review error:', e);
-      Alert.alert('Save Failed', e?.message || 'Could not save night review.');
+      setErrorMessage(e?.message || 'Could not save night review.');
+      setErrorModalVisible(true);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModalVisible(false);
+    onClose();
   };
 
   const triggerHaptic = () => {
@@ -139,7 +144,8 @@ export function NightReviewModal({
   const score = calculateScore();
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <>
+      <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           {/* Header */}
@@ -403,6 +409,59 @@ export function NightReviewModal({
         </View>
       </View>
     </Modal>
+
+    {/* 3D Night Review Celebration Modal */}
+    <CosmicModal
+      visible={successModalVisible}
+      onClose={handleSuccessClose}
+      badgeEmoji="🌙"
+      badgeGradient={Gradients.gamifiedPurple}
+      title="Night Review Confirmed! 🌙"
+      tag={`SCORE: ${score}% TARGET MET`}
+      subtitle={`Outstanding consistency! Your streak and achievements have been logged in the GATE master record.`}
+      items={[
+        {
+          icon: 'play-circle',
+          label: 'PW Lectures',
+          value: lecturesDone,
+          color: '#C084FC',
+        },
+        {
+          icon: 'document-text',
+          label: 'DPP Sheets',
+          value: dppsDone,
+          color: '#38BDF8',
+        },
+        {
+          icon: 'trophy',
+          label: 'GATE PYQs',
+          value: pyqsDone,
+          color: '#10B981',
+        },
+        {
+          icon: 'time',
+          label: 'Focused Study',
+          value: `${studyHours}h`,
+          color: '#F59E0B',
+        },
+      ]}
+      streakText="Daily streak is recorded! 🔥 Sleep well and recharge for tomorrow's mission."
+      primaryButtonText="DONE FOR TODAY 💫"
+      onPrimaryPress={handleSuccessClose}
+    />
+
+    {/* 3D Error Modal */}
+    <CosmicModal
+      visible={errorModalVisible}
+      onClose={() => setErrorModalVisible(false)}
+      type="error"
+      badgeEmoji="⚠️"
+      title="Save Failed"
+      subtitle={errorMessage}
+      primaryButtonText="GOT IT"
+      onPrimaryPress={() => setErrorModalVisible(false)}
+    />
+  </>
   );
 }
 

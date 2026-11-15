@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.2</Text>
-                  <Text style={styles.headerSubtitle}>{"Crash Fix, Normalized Queue & Cleaned UI"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.3</Text>
+                  <Text style={styles.headerSubtitle}>{"3D Gamified Popups & In-App Auto Updater"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -60,13 +60,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 1 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
-                  <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
+                  <Ionicons name="sparkles" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Crash Fix & Resilient Subject Editor</Text>
+                  <Text style={styles.featureTitle}>3D Gamified Popups Everywhere</Text>
                   <Text style={styles.featureDesc}>
-                    Fixed &apos;Cannot read property toString of null&apos; exception when opening subject details. All database values now have safe null-coalescing fallbacks.
+                    Replaced default white system alert dialogs with high-end 3D cosmic celebration cards, radiant orb badges, and fiery streak callouts.
                   </Text>
                 </View>
               </View>
@@ -75,13 +75,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 2 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
-                  <Ionicons name="planet" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
+                  <Ionicons name="cloud-download" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Sequential 1..12 Journey Wheel & Queue</Text>
+                  <Text style={styles.featureTitle}>In-App Auto-Update Engine</Text>
                   <Text style={styles.featureDesc}>
-                    Fixed all nodes showing &apos;#1&apos;. Journey wheel nodes now show proper 1 through 12 progression, and queue priority swapping correctly shifts subjects.
+                    No need to manually hunt for APKs. The app detects new updates automatically and lets you download and install with 1 tap.
                   </Text>
                 </View>
               </View>
@@ -90,13 +90,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 3 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
-                  <Ionicons name="flash-off" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
+                  <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Distraction-Free UI (Timer Removed)</Text>
+                  <Text style={styles.featureTitle}>3 Core Pillars Target Lock</Text>
                   <Text style={styles.featureDesc}>
-                    Removed top floating timer banner and unwanted timer buttons for a clean, uninterrupted preparation experience.
+                    Morning target setting is streamlined strictly around PW Lectures, DPP Sheets, and GATE PYQs for 100% focused preparation.
                   </Text>
                 </View>
               </View>
@@ -106,12 +106,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#06B6D4' }]}>
-                  <Ionicons name="trophy" size={18} color="#FFFFFF" />
+                  <Ionicons name="color-palette" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Integrated PYQ Counters</Text>
+                  <Text style={styles.featureTitle}>Cosmic 3D Subject Editor</Text>
                   <Text style={styles.featureDesc}>
-                    PYQs are now logged directly in subject cards, daily target lock, and evening review without needing a separate redundant navigation tab.
+                    Queue subject editor redesigned with radiant dark glass inputs, custom switches, and vibrant 3D buttons matching the global theme.
                   </Text>
                 </View>
               </View>
