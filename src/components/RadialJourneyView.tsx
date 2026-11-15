@@ -168,7 +168,7 @@ export function RadialJourneyView({
         const isDone = subj.status === 'done' || subj.status === 'completed';
         const isDoing = subj.status === 'doing' || (isActive && !isDone);
 
-        const nodeNumber = subj.queue_order || index + 1;
+        const nodeNumber = index + 1;
 
         return (
           <View

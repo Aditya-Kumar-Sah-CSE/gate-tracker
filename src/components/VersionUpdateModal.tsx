@@ -46,8 +46,8 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.headerIcon}>🚀</Text>
                 <View>
-                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.1</Text>
-                  <Text style={styles.headerSubtitle}>{"Notch Margin, UI Consistency & Schema Fixes"}</Text>
+                  <Text style={styles.headerTitle}>GATE TRACK 90 • v1.3.2</Text>
+                  <Text style={styles.headerSubtitle}>{"Crash Fix, Normalized Queue & Cleaned UI"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -60,13 +60,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 1 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
-                  <Ionicons name="planet" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
+                  <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Cosmic Radial Journey Wheel</Text>
+                  <Text style={styles.featureTitle}>Crash Fix & Resilient Subject Editor</Text>
                   <Text style={styles.featureDesc}>
-                    Dynamic 12-subject celestial path with 3D crystal gem nodes, gold completion stars, and live active diamond pin indicator.
+                    Fixed &apos;Cannot read property toString of null&apos; exception when opening subject details. All database values now have safe null-coalescing fallbacks.
                   </Text>
                 </View>
               </View>
@@ -75,13 +75,13 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             {/* Feature 2 */}
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
-                <View style={[styles.iconCircle, { backgroundColor: '#10B981' }]}>
-                  <Ionicons name="pie-chart" size={18} color="#FFFFFF" />
+                <View style={[styles.iconCircle, { backgroundColor: '#8B5CF6' }]}>
+                  <Ionicons name="planet" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Center 4-Axis Skill Radar Chart</Text>
+                  <Text style={styles.featureTitle}>Sequential 1..12 Journey Wheel & Queue</Text>
                   <Text style={styles.featureDesc}>
-                    Illuminated polygon visualizing Lectures, DPPs, PYQs, and Study Writing with overall preparation score.
+                    Fixed all nodes showing &apos;#1&apos;. Journey wheel nodes now show proper 1 through 12 progression, and queue priority swapping correctly shifts subjects.
                   </Text>
                 </View>
               </View>
@@ -91,12 +91,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#F59E0B' }]}>
-                  <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
+                  <Ionicons name="flash-off" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Database Schema Auto-Healing</Text>
+                  <Text style={styles.featureTitle}>Distraction-Free UI (Timer Removed)</Text>
                   <Text style={styles.featureDesc}>
-                    Resolved &apos;no such column: queue_order&apos; error with automatic PRAGMA schema repair and safe null-coalescing.
+                    Removed top floating timer banner and unwanted timer buttons for a clean, uninterrupted preparation experience.
                   </Text>
                 </View>
               </View>
@@ -106,12 +106,12 @@ export function VersionUpdateModal({ visible, onClose }: VersionUpdateModalProps
             <Card3D gradient={['rgba(30, 41, 59, 0.9)', 'rgba(15, 23, 42, 0.95)'] as any} style={styles.featureCard}>
               <View style={styles.featureRow}>
                 <View style={[styles.iconCircle, { backgroundColor: '#06B6D4' }]}>
-                  <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                  <Ionicons name="trophy" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>Interactive 1-Tap Counter Controls</Text>
+                  <Text style={styles.featureTitle}>Integrated PYQ Counters</Text>
                   <Text style={styles.featureDesc}>
-                    Clickable [-] and [+] controls directly on the active mission card to log Lectures, DPPs, PYQs (+1, +5), and study hours in real time.
+                    PYQs are now logged directly in subject cards, daily target lock, and evening review without needing a separate redundant navigation tab.
                   </Text>
                 </View>
               </View>

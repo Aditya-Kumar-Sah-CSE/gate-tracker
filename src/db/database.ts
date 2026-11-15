@@ -108,14 +108,28 @@ export async function updateAppSettings(settings: Partial<AppSettings>): Promise
 export async function getSubjectsInQueue(): Promise<Subject[]> {
   const db = await getDatabase();
   let subjects = await db.getAllAsync<Subject>(
-    'SELECT * FROM subjects ORDER BY queue_order ASC, name ASC;'
+    'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
   );
   if (!subjects || subjects.length < DEFAULT_GATE_SUBJECTS.length) {
     await seedDefaultSubjects(db, true);
     subjects = await db.getAllAsync<Subject>(
-      'SELECT * FROM subjects ORDER BY queue_order ASC, name ASC;'
+      'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
     );
   }
+
+  // Detect duplicate or uninitialized queue_order (e.g. all 1s from migration)
+  const uniqueOrders = new Set(subjects.map((s) => s.queue_order));
+  if (subjects.length > 1 && uniqueOrders.size < subjects.length) {
+    for (let i = 0; i < subjects.length; i++) {
+      const correctOrder = i + 1;
+      await db.runAsync('UPDATE subjects SET queue_order = ? WHERE id = ?;', [
+        correctOrder,
+        subjects[i].id,
+      ]);
+      subjects[i].queue_order = correctOrder;
+    }
+  }
+
   return subjects;
 }
 
@@ -171,40 +185,36 @@ export async function toggleSubjectStatus(
 export async function resetAllSubjectsToDefault(): Promise<Subject[]> {
   const db = await getDatabase();
   await seedDefaultSubjects(db, true);
+  for (let i = 0; i < DEFAULT_GATE_SUBJECTS.length; i++) {
+    await db.runAsync(
+      'UPDATE subjects SET queue_order = ?, is_active = ? WHERE id = ?;',
+      [i + 1, i === 0 ? 1 : 0, DEFAULT_GATE_SUBJECTS[i].id]
+    );
+  }
   return getSubjectsInQueue();
 }
 
 export async function setSubjectActive(subjectId: string): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
-    // Get target subject
-    const target = await db.getFirstAsync<Subject>(
-      'SELECT * FROM subjects WHERE id = ?;',
-      [subjectId]
+    const subjects = await db.getAllAsync<Subject>(
+      'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
     );
-    if (!target) return;
+    const targetIdx = subjects.findIndex((s) => s.id === subjectId);
+    if (targetIdx === -1) return;
 
-    // Shift all other subjects down if target wasn't #1
-    const currentOrder = target.queue_order ?? 1;
-    if (currentOrder > 1) {
-      try {
-        await db.runAsync(
-          'UPDATE subjects SET queue_order = queue_order + 1 WHERE queue_order < ?;',
-          [currentOrder]
-        );
-      } catch (e) {
-        console.warn('Shift queue_order warning:', e);
-      }
-    }
+    // Move target to index 0
+    const [target] = subjects.splice(targetIdx, 1);
+    subjects.unshift(target);
 
-    try {
-      await db.runAsync('UPDATE subjects SET is_active = 0 WHERE is_active = 1;');
+    // Save normalized queue_order 1..N
+    for (let i = 0; i < subjects.length; i++) {
+      const order = i + 1;
+      const isAct = i === 0 ? 1 : 0;
       await db.runAsync(
-        'UPDATE subjects SET is_active = 1, status = "doing", queue_order = 1 WHERE id = ?;',
-        [subjectId]
+        'UPDATE subjects SET queue_order = ?, is_active = ?, status = CASE WHEN ? = 1 AND status != "done" THEN "doing" ELSE status END WHERE id = ?;',
+        [order, isAct, isAct, subjects[i].id]
       );
-    } catch (e) {
-      console.warn('Set active subject warning:', e);
     }
   });
 }
@@ -213,7 +223,7 @@ export async function moveSubjectQueue(subjectId: string, direction: 'up' | 'dow
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     const subjects = await db.getAllAsync<Subject>(
-      'SELECT * FROM subjects ORDER BY queue_order ASC;'
+      'SELECT * FROM subjects ORDER BY queue_order ASC, rowid ASC;'
     );
     const index = subjects.findIndex((s) => s.id === subjectId);
     if (index === -1) return;
@@ -221,18 +231,20 @@ export async function moveSubjectQueue(subjectId: string, direction: 'up' | 'dow
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
     if (swapIndex < 0 || swapIndex >= subjects.length) return;
 
-    const currentSubj = subjects[index];
-    const swapSubj = subjects[swapIndex];
+    // Swap elements in memory
+    const temp = subjects[index];
+    subjects[index] = subjects[swapIndex];
+    subjects[swapIndex] = temp;
 
-    const tempOrder = currentSubj.queue_order;
-    const newOrder = swapSubj.queue_order;
-
-    await db.runAsync('UPDATE subjects SET queue_order = ? WHERE id = ?;', [newOrder, currentSubj.id]);
-    await db.runAsync('UPDATE subjects SET queue_order = ? WHERE id = ?;', [tempOrder, swapSubj.id]);
-
-    // Keep #1 marked as active
-    await db.runAsync('UPDATE subjects SET is_active = 0 WHERE is_active = 1;');
-    await db.runAsync('UPDATE subjects SET is_active = 1, status = "active" WHERE queue_order = 1;');
+    // Persist normalized sequential order 1..N
+    for (let i = 0; i < subjects.length; i++) {
+      const order = i + 1;
+      const isAct = i === 0 ? 1 : 0;
+      await db.runAsync(
+        'UPDATE subjects SET queue_order = ?, is_active = ? WHERE id = ?;',
+        [order, isAct, subjects[i].id]
+      );
+    }
   });
 }
 

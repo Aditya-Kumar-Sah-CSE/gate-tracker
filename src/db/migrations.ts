@@ -99,6 +99,24 @@ export async function ensureAllSchemas(db: SQLiteDatabase): Promise<void> {
           }
         }
       }
+
+      // Check and normalize queue_order if corrupt/duplicates
+      try {
+        const existingSubjs = await db.getAllAsync<{ id: string; queue_order: number }>(
+          'SELECT id, queue_order FROM subjects ORDER BY queue_order ASC, rowid ASC;'
+        );
+        const uniqueSet = new Set(existingSubjs.map((s) => s.queue_order));
+        if (existingSubjs.length > 1 && uniqueSet.size < existingSubjs.length) {
+          for (let i = 0; i < existingSubjs.length; i++) {
+            await db.runAsync('UPDATE subjects SET queue_order = ? WHERE id = ?;', [
+              i + 1,
+              existingSubjs[i].id,
+            ]);
+          }
+        }
+      } catch (err) {
+        console.warn('Queue order check warning:', err);
+      }
     }
 
     // 2. Ensure daily_goals table and columns

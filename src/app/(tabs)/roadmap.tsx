@@ -112,18 +112,20 @@ export default function QueueScreen() {
 
   const openEdit = (subj: Subject) => {
     setEditingSubj(subj);
-    setEditName(subj.name);
-    setEditTotalLec(subj.total_lectures.toString());
+    setEditName(subj.name || '');
+    setEditTotalLec(subj.total_lectures != null ? String(subj.total_lectures) : '30');
     setEditIsEstimated(subj.is_lecture_count_estimated === 1);
-    setEditTotalDpps(subj.total_dpps.toString());
+    setEditTotalDpps(subj.total_dpps != null ? String(subj.total_dpps) : '0');
     setEditModalVisible(true);
   };
 
   const saveEdit = async () => {
     if (!editingSubj) return;
     try {
-      const totalLec = parseInt(editTotalLec, 10) || editingSubj.total_lectures;
-      const totalDpp = parseInt(editTotalDpps, 10) || 0;
+      const parsedLec = parseInt(editTotalLec, 10);
+      const totalLec = !isNaN(parsedLec) && parsedLec > 0 ? parsedLec : (editingSubj.total_lectures || 30);
+      const parsedDpp = parseInt(editTotalDpps, 10);
+      const totalDpp = !isNaN(parsedDpp) && parsedDpp >= 0 ? parsedDpp : 0;
       await updateSubjectDetails(editingSubj.id, {
         name: editName.trim() || editingSubj.name,
         total_lectures: totalLec,

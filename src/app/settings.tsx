@@ -29,11 +29,11 @@ export default function SettingsScreen() {
 
   const [startDate, setStartDate] = useState(settings?.prep_start_date || '2026-11-12');
   const [examDate, setExamDate] = useState(settings?.target_exam_date || '2027-02-06');
-  const [dailyHours, setDailyHours] = useState((settings?.daily_study_hours_target || 8).toString());
-  const [dailyLectures, setDailyLectures] = useState((settings?.daily_lecture_target || 5).toString());
-  const [dailyDpps, setDailyDpps] = useState((settings?.daily_dpp_target || 2).toString());
-  const [dailyPyqs, setDailyPyqs] = useState((settings?.daily_pyq_target || 20).toString());
-  const [dailyRev, setDailyRev] = useState((settings?.daily_revision_minutes_target || 60).toString());
+  const [dailyHours, setDailyHours] = useState(String(settings?.daily_study_hours_target ?? 8));
+  const [dailyLectures, setDailyLectures] = useState(String(settings?.daily_lecture_target ?? 5));
+  const [dailyDpps, setDailyDpps] = useState(String(settings?.daily_dpp_target ?? 2));
+  const [dailyPyqs, setDailyPyqs] = useState(String(settings?.daily_pyq_target ?? 20));
+  const [dailyRev, setDailyRev] = useState(String(settings?.daily_revision_minutes_target ?? 60));
   const [notifEnabled, setNotifEnabled] = useState(settings?.notifications_enabled === 1);
   const [morningTime, setMorningTime] = useState(settings?.morning_reminder_time || '07:00');
   const [nightTime, setNightTime] = useState(settings?.night_reminder_time || '21:00');
@@ -373,7 +373,7 @@ export default function SettingsScreen() {
         <View style={styles.versionRow}>
           <View>
             <Text style={styles.versionTitle}>GATE TRACK 90</Text>
-            <Text style={styles.versionSub}>Release Version 1.3.1 (Build 5)</Text>
+            <Text style={styles.versionSub}>Release Version 1.3.2 (Build 6)</Text>
           </View>
           <View style={styles.versionTag}>
             <Text style={styles.versionTagText}>LATEST</Text>

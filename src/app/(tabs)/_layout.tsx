@@ -61,10 +61,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="pyq"
         options={{
-          title: 'PYQ',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={size - 2} color={color as string} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

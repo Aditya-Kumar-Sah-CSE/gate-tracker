@@ -5,7 +5,6 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { getDatabase } from '../db/database';
 import { useAppStore } from '../stores/appStore';
-import { TimerBanner } from '../components/TimerBanner';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -45,7 +44,6 @@ export default function RootLayout() {
   return (
     <View style={styles.root}>
       <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
-      <TimerBanner />
       <Stack
         screenOptions={{
           headerStyle: {

@@ -40,7 +40,7 @@ let hasAutoShownVersion = false;
 let hasAutoOpenedNightReviewToday = false;
 
 export default function DashboardScreen() {
-  const { settings, dataVersion, triggerRefresh, startTimer } = useAppStore();
+  const { settings, dataVersion, triggerRefresh } = useAppStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -234,7 +234,7 @@ export default function DashboardScreen() {
                 style={styles.versionBadge}
                 activeOpacity={0.8}
               >
-                <Text style={styles.versionBadgeText}>v1.3.1 🚀</Text>
+                <Text style={styles.versionBadgeText}>v1.3.2 🚀</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
@@ -616,12 +616,6 @@ export default function DashboardScreen() {
                         style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(192, 132, 252, 0.35)' }]}
                       >
                         <Ionicons name="add" size={12} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => startTimer(activeSubject.id, 'lecture')}
-                        style={[styles.miniAdjustBtn, { backgroundColor: 'rgba(168, 85, 247, 0.45)', width: 28 }]}
-                      >
-                        <Ionicons name="timer-outline" size={12} color="#FFFFFF" />
                       </TouchableOpacity>
                     </View>
                   </View>
